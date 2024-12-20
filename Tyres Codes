@@ -1,0 +1,103 @@
+# loading the dataset
+ls(E_Data_c)
+
+
+# Load the car package
+library(car)
+# Fit a linear model using your dataset
+lm_model <- lm(price ~ ., data = as.data.frame(E_Data_c$lgtdata[[1]]$X))
+
+# Calculate VIF for each variable in the model
+vif_values <- vif(lm_model)
+
+# View the VIF values
+print(vif_values)
+#Defining Baseline for categorical attributes (brand, review & tes
+
+# Remove baseline attributes from X for all respondents
+for (i in seq_along(E_Data_c$lgtdata)) {
+  E_Data_c$lgtdata[[i]]$X <- E_Data_c$lgtdata[[i]]$X[, -c(2, 26, 31)]   # Remove 'michelin', 'rev_1star', 'test_1star'
+}
+# Fit a linear model using your dataset to check for multicollinierity
+lm_model <- lm(price ~ ., data = as.data.frame(E_Data_c$lgtdata[[1]]$X))
+
+# Calculate VIF for each variable in the model to check for multicollinierity
+vif_values <- vif(lm_model)
+
+# View the VIF values to check for multicollinierity
+print(vif_values)
+
+# Combine all y vectors
+y_all <- unlist(lapply(E_Data_c$lgtdata, function(respondent_data) respondent_data$y))
+
+# Combine all X matrices
+X_all <- do.call(rbind, lapply(E_Data_c$lgtdata, function(respondent_data) respondent_data$X))
+
+# Verify dimensions
+print(length(y_all))  # Should be (number of respondents) × (tasks per respondent) = 3652 × 15
+print(dim(X_all))     # Should be length(y_all) × number of attributes = 54780 × 32 (after baseline adjustment)
+
+aligned <- nrow(X_all) == length(y_all) * E_Data_c$p
+print(aligned)  # Should return TRUE
+
+# Prepare MCMC data
+mcmc_data <- list(
+  y = y_all,         # Choices vector
+  X = X_all,         # Attributes matrix
+  p = E_Data_c$p     # Number of alternatives per task
+)
+# Load bayesm package
+library(bayesm)
+
+# Run MCMC estimation
+out_mcmc <- rhierMnlRwMixture(
+  Data = list(lgtdata = E_Data_c$lgtdata, p = E_Data_c$p),  # Use the full dataset
+  Prior = list(ncomp = 1),  # Specify the number of mixture components (1 for homogeneous)
+  Mcmc = list(R = 10000, keep = 10)  # Number of iterations and thinning interval
+)
+
+# Summarize results
+summary(out_mcmc$betadraw)  # Posterior draws for coefficients
+
+# Summarize posterior draws
+summary(out_mcmc$betadraw)  # Provides basic statistics for the posterior draws
+
+# Combine all respondent-level draws by averaging over respondents
+overall_betadraw <- apply(out_mcmc$betadraw, c(2, 3), mean)  # Average across respondents (dimension 1)
+
+# Compute posterior means and standard deviations across iterations
+posterior_summary <- round(cbind(
+  Mean = rowMeans(overall_betadraw),  # Mean across iterations for each parameter
+  SD = apply(overall_betadraw, 1, sd)  # Standard deviation across iterations for each parameter
+), digits = 3)
+
+# Check dimensions
+print(dim(posterior_summary))  # Should return 32 × 2
+print(posterior_summary)       # Display the summary# Compute posterior means and standard deviations
+
+# Label columns
+colnames(posterior_summary) <- c("Mean", "SD")
+print(posterior_summary)
+
+# Plot histograms for the first 4 parameters
+par(mfrow = c(2, 2))  # Arrange plots in a 2x2 grid
+for (i in 1:4) {
+  hist(overall_betadraw[i, ], main = paste("Parameter:", rownames(posterior_summary)[i]),
+       xlab = "Posterior Draws", breaks = 20, col = "lightblue")
+}
+
+price_index <- which(colnames(E_Data_c$lgtdata[[1]]$X) == "price")
+print(price_index)  # Should return the column index for "price"
+
+#Introducing price constraint
+SignRes <- double(ncol(E_Data_c$lgtdata[[1]]$X))  # Initialize with zeros
+SignRes[price_index] <- -1  # Constrain the price coefficient to be negative
+
+library(bayesm)
+
+#######Mixed Logit (Hierarchical Bayesian) Model########
+out_HB_price_constr <- rhierMnlRwMixture(
+  Data = list(lgtdata = E_Data_c$lgtdata, p = E_Data_c$p),  # Use full dataset
+  Prior = list(ncomp = 1, SignRes = SignRes),  # Apply the price constraint
+  Mcmc = list(R = 40000, keep = 10)  # 40,000 iterations, thinning every 10
+)
