@@ -89,15 +89,18 @@ for (i in 1:4) {
 price_index <- which(colnames(E_Data_c$lgtdata[[1]]$X) == "price")
 print(price_index)  # Should return the column index for "price"
 
-#Introducing price constraint
-SignRes <- double(ncol(E_Data_c$lgtdata[[1]]$X))  # Initialize with zeros
-SignRes[price_index] <- -1  # Constrain the price coefficient to be negative
+# Introducing Price for constraints 
+SignRes <- double(ncol(E_Data_c$lgtdata[[1]]$X))
+SignRes[1] <- -1  # Example: Constrain the first attribute to be negative (e.g., price)
 
-library(bayesm)
-
-#######Mixed Logit (Hierarchical Bayesian) Model########
-out_HB_price_constr <- rhierMnlRwMixture(
-  Data = list(lgtdata = E_Data_c$lgtdata, p = E_Data_c$p),  # Use full dataset
-  Prior = list(ncomp = 1, SignRes = SignRes),  # Apply the price constraint
+# Run hierarchical Bayesian mixed logit with covariates
+out_HB_covariates <- rhierMnlRwMixture(
+  Data = list(
+    lgtdata = E_Data_c$lgtdata,
+    Z = E_Data_c$Z,  # Add covariates
+    p = E_Data_c$p   # Number of alternatives per task
+  ),
+  Prior = list(ncomp = 1, SignRes = SignRes),  # One mixture component, constraints
   Mcmc = list(R = 40000, keep = 10)  # 40,000 iterations, thinning every 10
 )
+
