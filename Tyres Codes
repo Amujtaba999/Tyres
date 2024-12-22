@@ -167,7 +167,7 @@ plot(out_HB_covariates$loglike, type = "l",
      main = "Log-Likelihood Convergence",
      xlab = "Iteration", ylab = "Log-Likelihood")
 
-# Select attributes of interest (e.g., "price", "continental", "goodyear")
+# Select attributes of interest ("comfort_type", "sports_type","stand_longevity_km","plus_8thou_km", "fuel_eff_C", "grip_wet_C", "rev_5star","test_4star")
 selected_attributes <- c("comfort_type", "sports_type","stand_longevity_km",
                          "plus_8thou_km", "fuel_eff_C", "grip_wet_C", "rev_5star",
                          "test_4star")
