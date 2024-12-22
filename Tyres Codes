@@ -111,7 +111,77 @@ windows()
 plot(out_HB_covariates$loglike, type = "l", main = "Log-Likelihood Over Iterations",
      xlab = "Iterations", ylab = "Log-Likelihood")
 
-
 # Get the dimensions of beta draws
-print(dim(out_HB$betadraw))  # Respondents × Attributes × Iterations
+print(dim(out_HB_covariates$betadraw))  # Respondents × Attributes × Iterations
 
+# Specify the full file path, including the file name and extension
+file_path <- "C:/users/olich/OneDrive/Desktop/Winter 24-25/CSCC/Assignments/out_HB_covariates.RData"
+
+# Save the object to the specified file
+save(out_HB_covariates, file = file_path)
+
+# Set burn-in iteration
+burn_in <- 1800
+
+# Extract converged iterations (from 18,000 onward)
+betadraw_converged <- out_HB_covariates$betadraw[, , (burn_in + 1):dim(out_HB_covariates$betadraw)[3]]
+
+# Check dimensions of the resulting array
+print(dim(betadraw_converged))  # Should return Respondents × Attributes × Iterations
+
+# Extract post burn-in samples
+betadraw_converged <- out_HB_covariates$betadraw[, , (burn_in + 1):dim(out_HB_covariates$betadraw)[3]]
+
+# Assign dimension names
+colnames_converged <- colnames(E_Data_c$lgtdata[[1]]$X)  # Attribute names
+dimnames(betadraw_converged) <- list(
+  NULL,                 # Respondents
+  colnames_converged,   # Attributes
+  NULL                  # Iterations
+)
+
+# Check dimensions
+print(dim(betadraw_converged))  # Should be Respondents × Attributes × (4000 - burn_in)
+
+# Posterior means and standard deviations for each respondent and attribute
+posterior_means <- apply(betadraw_converged, c(1, 2), mean)  # Mean across iterations
+posterior_sds <- apply(betadraw_converged, c(1, 2), sd)      # SD across iterations
+
+# View respondent-level summaries for the first few respondents
+print("Posterior Means (Respondent-Level):")
+print(round(posterior_means[1:5, ], 3))  # First 5 respondents
+print("Posterior SDs (Respondent-Level):")
+print(round(posterior_sds[1:5, ], 3))    # First 5 respondents
+
+# Overall attribute-level summaries (averaged across respondents)
+overall_means <- colMeans(posterior_means)
+overall_sds <- apply(posterior_means, 2, sd)
+posterior_summary <- round(cbind(Mean = overall_means, SD = overall_sds), 3)
+
+# View overall summaries
+print("Posterior Summary (Overall):")
+print(posterior_summary)
+
+# Log-likelihood trace
+plot(out_HB_covariates$loglike, type = "l",
+     main = "Log-Likelihood Convergence",
+     xlab = "Iteration", ylab = "Log-Likelihood")
+
+# Select attributes of interest (e.g., "price", "continental", "goodyear")
+selected_attributes <- c("comfort_type", "sports_type","stand_longevity_km",
+                         "plus_8thou_km", "fuel_eff_C", "grip_wet_C", "rev_5star",
+                         "test_4star")
+
+# Plot densities for the first respondent
+windows()
+par(mfrow = c(2, 2))  # Layout for 2x2 plots
+
+for (attr in selected_attributes) {
+  plot(density(betadraw_converged[1, attr, ]), 
+       main = paste("Density for", attr, "(Respondent 1)"),
+       xlab = "Coefficient Value", ylab = "Density")
+  abline(v = mean(betadraw_converged[1, attr, ]), col = "red")  # Mean line
+  
+}
+save(betadraw_converged, file = "betadraw_converged.RData")
+save(posterior_summary, file = "posterior_summary.RData")
