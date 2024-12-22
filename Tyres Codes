@@ -106,4 +106,12 @@ out_HB_covariates <- rhierMnlRwMixture(
   Prior = list(ncomp = 1, SignRes = SignRes),  # Apply sign constraint
   Mcmc = list(R = 40000, keep = 10)           # 40,000 iterations, thinning every 10
 )
+#Verify Convergence of the Model
+windows()
+plot(out_HB_covariates$loglike, type = "l", main = "Log-Likelihood Over Iterations",
+     xlab = "Iterations", ylab = "Log-Likelihood")
+
+
+# Get the dimensions of beta draws
+print(dim(out_HB$betadraw))  # Respondents × Attributes × Iterations
 
