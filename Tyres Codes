@@ -185,3 +185,288 @@ for (attr in selected_attributes) {
 }
 save(betadraw_converged, file = "betadraw_converged.RData")
 save(posterior_summary, file = "posterior_summary.RData")
+
+#Combine iterations into a single respondent-level array for betaexchange
+betaexchange <- array(
+  aperm(betadraw_converged, perm = c(1, 3, 2)),
+  dim = c(dim(betadraw_converged)[1] * dim(betadraw_converged)[3], dim(betadraw_converged)[2])
+)
+
+# Compute the mean and heterogeneity (standard deviation) across respondents
+mpref <- cbind(
+  colMeans(betaexchange),                # Mean preferences for each attribute
+  apply(betaexchange, 2, sd)             # Heterogeneity (SD) of preferences
+)
+
+# Assign column names
+colnames(mpref) <- c("Mean Preference", "Heterogeneity")
+rownames(mpref) <- colnames(E_Data_c$lgtdata[[1]]$X)
+
+# View the results
+print(round(mpref, digits = 3))
+
+# Compute mean preferences from the Homogeneous model
+aggregate_means <- apply(out_mcmc$betadraw, 2, mean)  # Homogeneous model posterior means
+
+# Combine respondent-level and Homogeneous-level means for comparison
+comparison <- round(cbind(
+  Respondent_Level_Mean = mpref[, "Mean Preference"],  # From individual-level model
+  Aggregate_Mean = aggregate_means                    # From homogeneous model
+), digits = 2)
+
+# View the comparison
+print(comparison)
+
+# Set attribute labels after excluding baseline levels
+colnames(betaexchange) <- colnames(E_Data_c$lgtdata[[1]]$X)
+
+# Visualize preference heterogeneity
+windows()
+par(mfcol = c(2, 2))
+
+# Plot density for "price"
+plot(density(betaexchange[, "price"]), 
+     main = "Price Preference Distribution", 
+     xlab = "Price Coefficient")
+
+# Plot density for "comfort_type"
+plot(density(betaexchange[, "comfort_type"]), 
+     main = "comfort_type Preference Distribution", 
+     xlab = "comfort_type Coefficient")
+
+# Plot density for "Longevity"
+plot(density(betaexchange[, "plus_8thou_km"]), 
+     main = "plus_8thou_km Preference Distribution", 
+     xlab = "plus_8thou_km Coefficient")
+
+# Plot density for "rolling"
+plot(density(betaexchange[, "fuel_eff_F"]), 
+     main = "fuel_eff_F Preference Distribution", 
+     xlab = "fuel_eff_F Coefficient")
+
+# Plot scatter plot between two attributes (e.g., "price" vs. "rev_5star")
+smoothScatter(betaexchange[, "price"], betaexchange[, "rev_5star"], 
+              xlab = "Price Coefficient", 
+              ylab = "rev_5star Coefficient", 
+              main = "Price vs. rev_5star Preferences")
+
+# Add another scatter plot (e.g., "price" vs. "test_5star")
+smoothScatter(betaexchange[, "price"], betaexchange[, "test_5star"], 
+              xlab = "Price Coefficient", 
+              ylab = "test_5star Coefficient", 
+              main = "Price vs. test_5star Preferences")
+
+# Open a new plotting window
+windows()
+par(mfcol = c(4, 4))  # Create a 4x4 grid of plots
+
+# Loop through all attributes in `betaexchange`
+for (i in 1:ncol(betaexchange)) {
+  # Plot density for each attribute
+  plot(density(betaexchange[, i]), 
+       main = colnames(betaexchange)[i], 
+       xlab = "Coefficient Value", 
+       ylab = "Density")
+}
+
+# Open a new plotting window
+windows()
+par(mfrow = c(3, 3))  # Create a 3x3 grid of scatter plots
+
+# Define pairs of attributes to compare
+attribute_pairs <- list(
+  c("price", "continental"),
+  c("price", "goodyear"),
+  c("price", "stand_longevity_km"),
+  c("price", "plus_8thou_km"),
+  c("continental", "pirelli"),
+  c("grip_wet_B", "fuel_eff_B"),
+  c("stand_longevity_km", "plus_4thou_km"),
+  c("rev_5star", "test_5star")
+)
+
+# Generate scatter plots for the selected pairs
+for (pair in attribute_pairs) {
+  smoothScatter(betaexchange[, pair[1]], betaexchange[, pair[2]], 
+                xlab = pair[1], 
+                ylab = pair[2], 
+                main = paste(pair[1], "vs.", pair[2]))
+}
+
+# Define alternatives with attributes
+alt1 <- c(1, 0, 0, 0, 0, 0, 0, 0, 0,  # Brand: continental
+          1, 0,                       # Type: comfort_type
+          0, 0, 0, 1,                 # Longevity: plus_8thou_km
+          0, 0, 1, 0,                 # Rolling Resistance: fuel_eff_E
+          0, 1, 0, 0,                 # Grip: grip_wet_C
+          0, 1, 0, 0,                 # Review: rev_3star
+          0, 0, 0, 1)                 # Test: test_5star
+
+alt2 <- c(0, 0, 0, 0, 1, 0, 0, 0, 0,  # Brand: kleber
+          1, 0,                       # Type: comfort_type
+          0, 1, 0, 0,                 # Longevity: stand_longevity_km
+          0, 1, 0, 0,                 # Rolling Resistance: fuel_eff_C
+          0, 0, 0, 1,                 # Grip: grip_wet_E
+          0, 0, 1, 0,                 # Review: rev_4star
+          0, 0, 0, 1)                 # Test: test_5star
+
+alt3 <- c(0, 0, 1, 0, 0, 0, 0, 0, 0,  # Brand: bridgestone
+          0, 1,                       # Type: sports_type
+          0, 0, 1, 0,                 # Longevity: plus_4thou_km
+          1, 0, 0, 0,                 # Rolling Resistance: fuel_eff_B
+          0, 0, 1, 0,                 # Grip: grip_wet_D
+          0, 1, 0, 0,                 # Review: rev_3star
+          0, 0, 0, 1)                 # Test: test_5star
+
+alt4 <- c(0, 0, 0, 0, 0, 0, 0, 0, 1,  # Brand: low_price-brand
+          1, 0,                       # Type: comfort_type
+          0, 0, 0, 1,                 # Longevity: plus_8thou_km
+          0, 0, 1, 0,                 # Rolling Resistance: fuel_eff_E
+          0, 0, 0, 1,                 # Grip: grip_wet_E
+          0, 0, 0, 1,                 # Review: rev_5star
+          0, 0, 0, 1)                 # Test: test_5star
+
+alt5 <- c(0, 0, 0, 1, 0, 0, 0, 0, 0,  # Brand: low_price-brand
+          1, 0,                       # Type: comfort_type
+          1, 0, 0, 0,                 # Longevity: min_4thou_km
+          0, 0, 1, 0,                 # Rolling Resistance: fuel_eff_E
+          1, 0, 0, 0,                 # Grip: grip_wet_A
+          0, 0, 0, 1,                 # Review: rev_5star
+          0, 1, 0, 0)                 # Test: test_3star
+
+# Define the outside option
+outside_option <- rep(0, length(alt1))
+
+# Combine the alternatives into a choice set
+choice_set <- rbind(alt1, alt2, alt3, alt4, alt5, outside_option)
+# Add a placeholder `price` column at the first position
+choice_set <- cbind(price = rep(0, nrow(choice_set)), choice_set)
+
+# Define column names for the modified choice set
+colnames(choice_set) <- c(
+  "price", "continental", "goodyear", "bridgestone", "pirelli", "kleber",
+  "bfgoodrich", "firestone", "hankook", "low_price-brand", "comfort_type",
+  "sports_type", "min_4thou_km", "stand_longevity_km", "plus_4thou_km",
+  "plus_8thou_km", "fuel_eff_B", "fuel_eff_C", "fuel_eff_E", "fuel_eff_F",
+  "grip_wet_B", "grip_wet_C", "grip_wet_E", "grip_wet_F", "rev_2star",
+  "rev_3star", "rev_4star", "rev_5star", "test_2star", "test_3star",
+  "test_4star", "test_5star"
+)
+# Inspect the choice set
+print(choice_set)
+
+
+# Set burn-in period (from your mixed logit model setup)
+burn_in <- 1800
+
+# Extract post-burn-in samples
+betadraw_converged <- out_HB_covariates$betadraw[, , (burn_in + 1):dim(out_HB_covariates$betadraw)[3]]
+
+# Compute the average betas across iterations (mean over the third dimension)
+betadraw_avg <- apply(betadraw_converged, c(2, 3), mean)
+
+# Set row names for `betadraw_avg` to match attribute names
+rownames(betadraw_avg) <- colnames(E_Data_c$lgtdata[[1]]$X
+
+
+# Define price levels
+prices <- seq(3, 10, by = 0.5)  # Example price levels from 3 to 10 with 0.5 increments
+
+# Append price levels to the choice set for each price level
+choiceset_with_price <- lapply(prices, function(price) {
+  choice_set_with_price <- choice_set
+  choice_set_with_price[, "price"] <- price  # Assign price value to the first column
+  return(choice_set_with_price)
+})
+
+# Inspect the first choice set with appended price
+print(choiceset_with_price[[1]])
+
+#Price Demand Calculation
+compute_probabilities <- function(prices, choiceset_with_price, betadraw_avg) {
+  # Initialize a list to store probabilities
+  probabilities_list <- list()
+  
+  # Iterate over each price level
+  for (i in seq_along(prices)) {
+    cat("Processing price level:", prices[i], "\n")
+    
+    # Extract the choice set for the current price level
+    current_choice_set <- choiceset_with_price[[i]]
+    
+    # Calculate utilities for each alternative
+    utilities <- current_choice_set %*% betadraw_avg  # Matrix multiplication
+    
+    # Exponentiate the utilities
+    exp_utilities <- exp(utilities)
+    
+    # Normalize by summing over rows (choices)
+    probabilities <- exp_utilities / rowSums(exp_utilities)
+    
+    # Store the probabilities
+    probabilities_list[[i]] <- probabilities
+  }
+  
+  return(probabilities_list)
+}
+
+# Compute probabilities for all price levels
+probabilities <- compute_probabilities(prices, choiceset_with_price, betadraw_avg)
+
+# Inspect the first set of probabilities
+print(probabilities[[1]])  # View probabilities for the first price level
+print(dim(probabilities))
+
+
+
+# Function to compute market shares
+compute_market_shares <- function(choice_set, betadraw) {
+  # Initialize a matrix to store market shares
+  num_alternatives <- nrow(choice_set)
+  num_respondents <- dim(betadraw)[1]
+  
+  # Matrix to store probabilities for each respondent and alternative
+  probabilities <- matrix(0, nrow = num_respondents, ncol = num_alternatives)
+  
+  # Iterate over respondents
+  for (i in 1:num_respondents) {
+    # Compute utilities for each alternative for the current respondent
+    utilities <- choice_set %*% betadraw[i, ]
+    
+    # Compute exponential utilities
+    exp_utilities <- exp(utilities)
+    
+    # Normalize probabilities (divide by the sum of exp_utilities)
+    probabilities[i, ] <- exp_utilities / sum(exp_utilities)
+  }
+  
+  # Aggregate probabilities to get average market shares
+  market_shares <- colMeans(probabilities)
+  
+  return(market_shares)
+}
+
+# Remove price column from choice set
+choice_set_no_price <- choice_set[, -which(colnames(choice_set) == "price")]
+
+# Compute market shares using the betadraws
+market_shares <- compute_market_shares(choice_set_no_price, betadraw_avg)
+
+# Print the market shares
+print("Market Shares (Average across respondents):")
+print(market_shares)
+
+# Optionally, plot the market shares
+barplot(
+  market_shares,
+  names.arg = rownames(choice_set),
+  main = "Market Shares Without Price Levels",
+  xlab = "Alternatives",
+  ylab = "Market Share",
+  col = "skyblue"
+)
+
+
+# Confirm files were saved
+print(paste("Mixed logit model saved to:", file_path_hb))
+print(paste("Homogeneous model saved to:", file_path_mc))
