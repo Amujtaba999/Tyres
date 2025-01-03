@@ -190,7 +190,7 @@ for (i in seq_along(E_Data_c$lgtdata)) {
 lm_model <- lm(price ~ ., data = as.data.frame(E_Data_c$lgtdata[[1]]$X))
 
 # Calculate VIF for each variable in the model to check for multicollinierity
-vif_values <- vif(ols_model)
+vif_values <- vif(lm_model)
 
 # View the VIF values to check for multicollinierity
 print(vif_values)
@@ -219,12 +219,6 @@ vif_values <- vif(ols_model)
 
 # View the VIF values
 print(vif_values)
-#Defining Baseline for categorical attributes (brand, review & tes
-
-# Remove baseline attributes from X for all respondents
-for (i in seq_along(E_Data_c$lgtdata)) {
-  E_Data_c$lgtdata[[i]]$X <- E_Data_c$lgtdata[[i]]$X[, -c(2, 26, 31)]   # Remove 'michelin', 'rev_1star', 'test_1star'# Fit the linear regression model (OLS)
-}
 
 # Linear Model after baseline  
 ols_model <- lm(choice ~ ., data = X_all_df)
@@ -241,10 +235,6 @@ print(vif_values)
 # Extract coefficients for reporting
 ols_coefficients <- summary(ols_model)$coefficients
 print(ols_coefficients)
-
-library(mclogit)
-out_logit=cbind(dat22$choice,dat22$Task) [1:30,] ## can't use this variable below: 
-## Error in formula[[2]][[1]] : object of type 'symbol' is not subsettable  
 
 # Load the package
 library(mclogit)
