@@ -285,97 +285,172 @@ out_logit <- mclogit(
 # Summarize the model results
 summary(out_logit)
 
-#Predicted Probability of alternatives using MClogit
-Brands = matrix(c(
-  1, 0, 0, 0, 0, 0, 0, 0,  # Continental
-  0, 1, 0, 0, 0, 0, 0, 0,  # Goodyear
-  0, 0, 1, 0, 0, 0, 0, 0,  # Bridgestone
-  0, 0, 0, 1, 0, 0, 0, 0,  # Pirelli
-  0, 0, 0, 0, 1, 0, 0, 0,  # Kleber
-  0, 0, 0, 0, 0, 1, 0, 0,  # BFGoodrich
-  0, 0, 0, 0, 0, 0, 1, 0,  # Firestone
-  0, 0, 0, 0, 0, 0, 0, 1,  # Hankook
-  0, 0, 0, 0, 0, 0, 0, 0   # Baseline: low_price-brand
-), byrow = TRUE, ncol = 8)
+# Brands Matrix (Baseline: low_price-brand)
+Brands <- matrix(c(
+  1, 0, 0, 0, 0, 0, 0, 0, 0,  # Continental
+  0, 1, 0, 0, 0, 0, 0, 0, 0,  # Goodyear
+  0, 0, 1, 0, 0, 0, 0, 0, 0,  # Bridgestone
+  0, 0, 0, 1, 0, 0, 0, 0, 0,  # Pirelli
+  0, 0, 0, 0, 1, 0, 0, 0, 0,  # Kleber
+  0, 0, 0, 0, 0, 1, 0, 0, 0,  # BFGoodrich
+  0, 0, 0, 0, 0, 0, 1, 0, 0,  # Firestone
+  0, 0, 0, 0, 0, 0, 0, 1, 0   # Hankook
+), byrow = TRUE, ncol = 9)
 
-rownames(Brands) <- c("continental", "goodyear", "bridgestone", "pirelli", "kleber", "bfgoodrich", "firestone", "hankook", "low_price-brand")
-colnames(Brands) <- rownames(Brands)[1:8]  # Exclude the baseline from column names
+# Set row and column names
+rownames(Brands) <- c("continental", "goodyear", "bridgestone", "pirelli", "kleber", "bfgoodrich", "firestone", "hankook")
+colnames(Brands) <- c("continental", "goodyear", "bridgestone", "pirelli", "kleber", "bfgoodrich", "firestone", "hankook", "low_price-brand")
 
+# Print Brands Matrix
 print(Brands)
 
 
-Type = matrix(c(
-  1,  # comfort_type
-  0   # Baseline: sports_type
-), byrow = TRUE, ncol = 1)
+# Type Matrix (Baseline: sports_type)
+Type <- matrix(c(
+  1, 0  # comfort_type
+), byrow = TRUE, nrow = 1)
 
 # Set row and column names
-rownames(Type) <- c("comfort_type", "sports_type")
-colnames(Type) <- "comfort_type"  # The non-baseline column
+rownames(Type) <- c("comfort_type")  # Only the non-baseline level as a row
+colnames(Type) <- c("comfort_type", "sports_type")  # Include baseline in the column names
 
+# Print the Type matrix
 print(Type)
 
+# Longevity Matrix (Baseline: min_4thou_km)
 Longevity <- matrix(c(
-  1, 0, 0,  # stand_longevity_km
-  0, 1, 0,   # plus_4thou_km
-  0, 0, 1,  # plus_8thou_km
-  0, 0, 0    # Baseline: min_4k_km
-), byrow = TRUE, ncol = 3)
+  0, 1, 0, 0,  # stand_longevity_km
+  0, 0, 1, 0,  # plus_4thou_km
+  0, 0, 0, 1   # plus_8thou_km
+), byrow = TRUE, nrow = 3)
 
 # Set row and column names
-rownames(Longevity) <- c("stand_longevity_km", "plus_4thou_km", "plus_8thou_km", "min_4k_km")
-colnames(Longevity) <- c("stand_longevity_km", "plus_4thou_km", "plus_8thou_km")
+rownames(Longevity) <- c("stand_longevity_km", "plus_4thou_km", "plus_8thou_km")  # Non-baseline levels as rows
+colnames(Longevity) <- c("min_4thou_km", "stand_longevity_km", "plus_4thou_km", "plus_8thou_km")  # Include baseline in columns
 
+# Print the Longevity matrix
 print(Longevity)
 
+# Rolling Matrix (Baseline: fuel_eff_B)
 Rolling <- matrix(c(
-  1, 0, 0,  # fuel_eff_C
-  0, 1, 0,  # fuel_eff_E
-  0, 0, 1,  # fuel_eff_F
-  0, 0, 0   # Baseline: fuel_eff_B
-), byrow = TRUE, ncol = 3)
+  0, 1, 0, 0,  # fuel_eff_C
+  0, 0, 1, 0,  # fuel_eff_E
+  0, 0, 0, 1   # fuel_eff_F
+), byrow = TRUE, nrow = 3)
 
 # Set row and column names
-rownames(Rolling) <- c("fuel_eff_C", "fuel_eff_E", "fuel_eff_F", "fuel_eff_B")
-colnames(Rolling) <- c("fuel_eff_C", "fuel_eff_E", "fuel_eff_F")
+rownames(Rolling) <- c("fuel_eff_C", "fuel_eff_E", "fuel_eff_F")  # Non-baseline levels as rows
+colnames(Rolling) <- c("fuel_eff_B", "fuel_eff_C", "fuel_eff_E", "fuel_eff_F")  # Include baseline in columns
 
+# Print the Rolling matrix
 print(Rolling)
 
+# Grip Matrix (Baseline: grip_wet_B)
 Grip <- matrix(c(
-  1, 0, 0,  # grip_wet_C
-  0, 1, 0,  # grip_wet_E
-  0, 0, 1,  # grip_wet_F
-  0, 0, 0   # Baseline: grip_wet_B
-), byrow = TRUE, ncol = 3)
+  0, 1, 0, 0,  # grip_wet_C
+  0, 0, 1, 0,  # grip_wet_E
+  0, 0, 0, 1   # grip_wet_F
+), byrow = TRUE, nrow = 3)
 
 # Set row and column names
-rownames(Grip) <- c("grip_wet_C", "grip_wet_E", "grip_wet_F", "grip_wet_B")
-colnames(Grip) <- c("grip_wet_C", "grip_wet_E", "grip_wet_F")
+rownames(Grip) <- c("grip_wet_C", "grip_wet_E", "grip_wet_F")  # Non-baseline levels as rows
+colnames(Grip) <- c("grip_wet_B", "grip_wet_C", "grip_wet_E", "grip_wet_F")  # Include baseline as the first column
 
+# Print the Grip matrix
 print(Grip)
 
+# Review Matrix (Baseline: rev_2star)
 Review <- matrix(c(
-  1, 0, 0,  # rev_3star
-  0, 1, 0,  # rev_4star
-  0, 0, 1,  # rev_5star
-  0, 0, 0   # Baseline: rev_2star
-), byrow = TRUE, ncol = 3)
+  0, 1, 0, 0,  # rev_3star
+  0, 0, 1, 0,  # rev_4star
+  0, 0, 0, 1   # rev_5star
+), byrow = TRUE, nrow = 3)
 
 # Set row and column names
-rownames(Review) <- c("rev_3star", "rev_4star", "rev_5star", "rev_2star")
-colnames(Review) <- c("rev_3star", "rev_4star", "rev_5star")
+rownames(Review) <- c("rev_3star", "rev_4star", "rev_5star")  # Non-baseline levels as rows
+colnames(Review) <- c("rev_2star", "rev_3star", "rev_4star", "rev_5star")  # Include baseline as the first column
 
+# Print the Review matrix
 print(Review)
 
+# Test Matrix (Baseline: test_2star)
 Test <- matrix(c(
-  1, 0, 0,  # test_3star
-  0, 1, 0,  # test_4star
-  0, 0, 1,  # test_5star
-  0, 0, 0   # Baseline: test_2star
-), byrow = TRUE, ncol = 3)
+  0, 1, 0, 0,  # test_3star
+  0, 0, 1, 0,  # test_4star
+  0, 0, 0, 1   # test_5star
+), byrow = TRUE, nrow = 3)
 
 # Set row and column names
-rownames(Test) <- c("test_3star", "test_4star", "test_5star", "test_2star")
-colnames(Test) <- c("test_3star", "test_4star", "test_5star")
+rownames(Test) <- c("test_3star", "test_4star", "test_5star")  # Non-baseline levels as rows
+colnames(Test) <- c("test_2star", "test_3star", "test_4star", "test_5star")  # Include baseline as the first column
 
+# Print the Test matrix
 print(Test)
+
+
+# Define price values for the alternatives
+alt_prices <- c(5.5, 3.0, 7.6)  # Example prices corresponding to your summary statistics
+
+# Define alternatives using the attribute matrices
+alt1 <- c(
+  price = alt_prices[1],
+  Brands["goodyear", ],
+  Type["comfort_type", ],
+  Longevity["stand_longevity_km",],
+  Rolling[ "fuel_eff_E",],
+  Grip["grip_wet_E",],
+  Review["rev_4star",],
+  Test["test_5star",]
+)
+
+alt2 <- c(
+  price = alt_prices[2],
+  Brands["bridgestone", ],
+  Type["comfort_type", ],
+  Longevity["plus_4thou_km",],
+  Rolling["fuel_eff_F",],
+  Grip["grip_wet_F",],
+  Review["rev_5star",],
+  Test["test_4star",]
+)
+
+alt3 <- c(
+  price = alt_prices[3],
+  Brands["kleber", ],
+  Type["comfort_type", ],
+  Longevity["plus_8thou_km",],
+  Rolling["fuel_eff_C",],
+  Grip["grip_wet_C",],
+  Review["rev_3star",],
+  Test["test_3star",]
+)
+
+# Outside option (all zeros, representing no selection from defined alternatives)
+alt_outside <- numeric(length(out_logit$coefficients))
+
+# Combine into a choice set
+choiceset <- rbind(alt1, alt2, alt3, alt_outside)
+
+# Set column names to match out_logit coefficients
+colnames(choiceset) <- names(out_logit$coefficients)
+
+# Set row names for alternatives
+rownames(choiceset) <- c("alt1", "alt2", "alt3", "outside")
+
+# Print the choiceset
+print(choiceset)
+
+######computing 'counterfactual' choice probabilities given estimates from data######
+
+Xbeta = choiceset %*% out_logit$coefficients
+
+## direct 
+prob_=exp(Xbeta)/sum(exp(Xbeta))
+
+## with numerical stabilization
+Xbetas = Xbeta - max(Xbeta)
+logdenom = log(sum(exp(Xbetas)))
+logprob = Xbetas - logdenom
+prob = exp(logprob)
+
+cbind(choiceset,prob)
