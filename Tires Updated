@@ -258,7 +258,7 @@ X_all_df$alt <- rep(1:E_Data_c$p, times = nrow(X_all) / E_Data_c$p)  # Alternati
 #Multinomial Logit Model Analysis
 out_logit <- mclogit(
   cbind(choice, id) ~ 
-    continental +
+    price + continental +
     goodyear +
     bridgestone +
     pirelli +
@@ -296,43 +296,96 @@ out_logit <- mclogit(
 summary(out_logit)
 
 #Predicted Probability of alternatives using MClogit
+Brands = matrix(c(
+  1, 0, 0, 0, 0, 0, 0, 0,  # Continental
+  0, 1, 0, 0, 0, 0, 0, 0,  # Goodyear
+  0, 0, 1, 0, 0, 0, 0, 0,  # Bridgestone
+  0, 0, 0, 1, 0, 0, 0, 0,  # Pirelli
+  0, 0, 0, 0, 1, 0, 0, 0,  # Kleber
+  0, 0, 0, 0, 0, 1, 0, 0,  # BFGoodrich
+  0, 0, 0, 0, 0, 0, 1, 0,  # Firestone
+  0, 0, 0, 0, 0, 0, 0, 1,  # Hankook
+  0, 0, 0, 0, 0, 0, 0, 0   # Baseline: low_price-brand
+), byrow = TRUE, ncol = 8)
+
+rownames(Brands) <- c("continental", "goodyear", "bridgestone", "pirelli", "kleber", "bfgoodrich", "firestone", "hankook", "low_price-brand")
+colnames(Brands) <- rownames(Brands)[1:8]  # Exclude the baseline from column names
+
+print(Brands)
 
 
-# Create the Brands matrix
-Brands <- matrix(0, nrow = 9, ncol = 8)  # 9 levels × 8 coefficients
-rownames(Brands) <- c("continental", "goodyear", "bridgestone", "pirelli", 
-                      "kleber", "bfgoodrich", "firestone", "hankook", "`low_price-brand`")
-colnames(Brands) <- names(out_logit$coefficients)[1:8]  # Coefficients for brands
+Type = matrix(c(
+  1,  # comfort_type
+  0   # Baseline: sports_type
+), byrow = TRUE, ncol = 1)
 
-# Fill diagonal with 1s for corresponding attributes, excluding the baseline
-diag(Brands[1:8, 1:8]) <- 1  # Only rows 1 to 8 (baseline:low_price_brand row remains zero)
-
-Type <- matrix(0, nrow = 2, ncol = 1)  # 2 levels × 1 coefficient
+# Set row and column names
 rownames(Type) <- c("comfort_type", "sports_type")
-colnames(Type) <- rownames(Type)[2]  # Only one column for "sports_type"
-Type[2, 1] <- 1 #Baseline: Comfort_type
+colnames(Type) <- "comfort_type"  # The non-baseline column
 
-Longevity <- matrix(0, nrow = 4, ncol = 3)  # 4 levels × 3 coefficients
-rownames(Longevity) <- c("min_4thou_km", "stand_longevity_km", "plus_4thou_km", "plus_8thou_km")
-colnames(Longevity) <- rownames(Longevity)[2:4]  # Excluding baseline
-diag(Longevity[2:4, ]) <- 1 #Baseline: min_4thou_km
+print(Type)
 
-FuelEfficiency <- matrix(0, nrow = 4, ncol = 3)  # 4 levels × 3 coefficients
-rownames(FuelEfficiency) <- c("fuel_eff_F", "fuel_eff_B", "fuel_eff_C", "fuel_eff_E")
-colnames(FuelEfficiency) <- rownames(FuelEfficiency)[2:4]  # Excluding baseline
-diag(FuelEfficiency[2:4, ]) <- 1 #baseline: fuel_eff_F
+Longevity <- matrix(c(
+  1, 0, 0,  # stand_longevity_km
+  0, 1, 0,   # plus_4thou_km
+  0, 0, 1,  # plus_8thou_km
+  0, 0, 0    # Baseline: min_4k_km
+), byrow = TRUE, ncol = 3)
 
-Grip <- matrix(0, nrow = 4, ncol = 3)  # 4 levels × 3 coefficients
-rownames(Grip) <- c("grip_wet_F", "grip_wet_B", "grip_wet_C", "grip_wet_E")
-colnames(Grip) <- rownames(Grip)[2:4]  # Excluding baseline
-diag(Grip[2:4, ]) <- 1 # baseline: grip_wet_F
+# Set row and column names
+rownames(Longevity) <- c("stand_longevity_km", "plus_4thou_km", "plus_8thou_km", "min_4k_km")
+colnames(Longevity) <- c("stand_longevity_km", "plus_4thou_km", "plus_8thou_km")
 
-Reviews <- matrix(0, nrow = 4, ncol = 3)  # 4 levels × 3 coefficients
-rownames(Reviews) <- c("rev_2star", "rev_3star", "rev_4star", "rev_5star")
-colnames(Reviews) <- rownames(Reviews)[2:4]  # Excluding baseline
-diag(Reviews[2:4, ]) <- 1 #baseline: rev_2star
+print(Longevity)
 
-Test <- matrix(0, nrow = 4, ncol = 3)  # 4 levels × 3 coefficients
-rownames(Test) <- c("test_2star", "test_3star", "test_4star", "test_5star")
-colnames(Test) <- rownames(Test)[2:4]  # Excluding baseline
-diag(Test[2:4, ]) <- 1 #baseline: test_2star
+Rolling <- matrix(c(
+  1, 0, 0,  # fuel_eff_C
+  0, 1, 0,  # fuel_eff_E
+  0, 0, 1,  # fuel_eff_F
+  0, 0, 0   # Baseline: fuel_eff_B
+), byrow = TRUE, ncol = 3)
+
+# Set row and column names
+rownames(Rolling) <- c("fuel_eff_C", "fuel_eff_E", "fuel_eff_F", "fuel_eff_B")
+colnames(Rolling) <- c("fuel_eff_C", "fuel_eff_E", "fuel_eff_F")
+
+print(Rolling)
+
+Grip <- matrix(c(
+  1, 0, 0,  # grip_wet_C
+  0, 1, 0,  # grip_wet_E
+  0, 0, 1,  # grip_wet_F
+  0, 0, 0   # Baseline: grip_wet_B
+), byrow = TRUE, ncol = 3)
+
+# Set row and column names
+rownames(Grip) <- c("grip_wet_C", "grip_wet_E", "grip_wet_F", "grip_wet_B")
+colnames(Grip) <- c("grip_wet_C", "grip_wet_E", "grip_wet_F")
+
+print(Grip)
+
+Review <- matrix(c(
+  1, 0, 0,  # rev_3star
+  0, 1, 0,  # rev_4star
+  0, 0, 1,  # rev_5star
+  0, 0, 0   # Baseline: rev_2star
+), byrow = TRUE, ncol = 3)
+
+# Set row and column names
+rownames(Review) <- c("rev_3star", "rev_4star", "rev_5star", "rev_2star")
+colnames(Review) <- c("rev_3star", "rev_4star", "rev_5star")
+
+print(Review)
+
+Test <- matrix(c(
+  1, 0, 0,  # test_3star
+  0, 1, 0,  # test_4star
+  0, 0, 1,  # test_5star
+  0, 0, 0   # Baseline: test_2star
+), byrow = TRUE, ncol = 3)
+
+# Set row and column names
+rownames(Test) <- c("test_3star", "test_4star", "test_5star", "test_2star")
+colnames(Test) <- c("test_3star", "test_4star", "test_5star")
+
+print(Test)
