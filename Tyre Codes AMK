@@ -1,0 +1,695 @@
+# loading the dataset
+ls(E_Data_c)
+
+#Choice Share Calculation
+countshare <- function(Xmat, yl, p, target) {
+  nchoice <- nrow(Xmat) / p  # Total number of choice tasks
+  neffect <- ncol(Xmat)      # Total number of attributes
+  Xar <- array(t(Xmat), dim = c(neffect, p, nchoice))  # 3D array for attributes
+  yar <- array(yl, dim = c(p, nchoice))  # 2D array for choices
+  
+  countex <- 0  # Count exposures
+  countch <- 0  # Count choices
+  
+  for (i in 1:nchoice) {  # Loop through each choice task
+    X <- t(Xar[,,i])  # Attributes matrix for the task
+    y <- yar[,i]      # Choices vector for the task
+    
+    if (sum(X[, target]) > 0) {  # Check if the level is presented
+      countex <- countex + 1  # Increment exposure counter
+      if (any(X[y == 1, target] == 1)) {  # Check if the level was chosen
+        countch <- countch + 1  # Increment choice counter
+      }
+    }
+  }
+  
+  return(c(countch / countex, countch, countex))  # Choice share, #choices, #exposures
+}
+
+
+# Function to compute probabilities for a range of attribute-levels
+countattribute <- function(Xmat, yl, p, attributerange) {
+  out <- matrix(0, nrow = length(attributerange), ncol = 3)  # Initialize output matrix
+  counter <- 0
+  
+  for (r in attributerange) {  # Loop through attribute range
+    counter <- counter + 1
+    out[counter, ] <- countshare(Xmat, yl, p, r)
+  }
+  
+  rownames(out) <- colnames(Xmat)[attributerange]  # Set row names as attribute names
+  colnames(out) <- c('choice share', '# choices', '# exposures')  # Set column names
+  
+  return(out)
+}
+
+View(X_all)
+# Apply the functions to your dataset
+# Use E_Data_c$lgtdata and combine results across respondents
+X_all <- do.call(rbind, lapply(E_Data_c$lgtdata, function(respondent) respondent$X))
+y_all <- unlist(lapply(E_Data_c$lgtdata, function(respondent) respondent$y))
+p <- E_Data_c$p
+X_all.df
+# Example: Calculate choice probabilities for brands
+brand_range <- 2:11  # Assuming columns 2 to 10 correspond to brands
+brand_probabilities <- countattribute(X_all, y_all, p, brand_range)
+
+# View results
+print(brand_probabilities)
+
+# Example: Calculate choice probabilities for type
+Type <- 12:13  # Assuming columns 11 to 12 correspond to brands
+Type_probabilities <- countattribute(X_all, y_all, p, Type)
+
+# View results
+print(Type_probabilities)
+
+# Example: Calculate choice probabilities for rolling
+rolling <- 17:20  # Assuming columns 11 to 12 correspond to brands
+rolling_probabilities <- countattribute(X_all, y_all, p, rolling)
+
+# View results
+print(rolling_probabilities)
+
+# Example: Calculate choice probabilities for grip
+grip <- 21:24  # Assuming columns 11 to 12 correspond to brands
+grip_probabilities <- countattribute(X_all, y_all, p, grip)
+
+# View results
+print(grip_probabilities)
+
+print(attributerange)
+if (any(attributerange > ncol(Xmat))) {
+  stop("Invalid column indices in attributerange.")
+}
+
+# Example: Calculate choice probabilities for test
+test <- 29:32  # Assuming columns 11 to 12 correspond to brands
+test_probabilities <- countattribute(X_all, y_all, p, test)
+View(test)
+# View results
+print(test_probabilities)
+X_all
+y_all
+# Example: Calculate choice probabilities for review attributes
+review_range <- 25:28  # Assuming columns 25 to 28 correspond to review attributes
+review_probabilities <- countattribute(X_all, y_all, p, review_range)
+View(review_range)
+# View results
+print(review_probabilities)
+
+# Example: Calculate choice probabilities for longevity attributes
+longevity_range <- 13:16  # Assuming columns 13 to 16 correspond to longevity attributes
+longevity_probabilities <- countattribute(X_all, y_all, p, longevity_range)
+
+# View results
+print(longevity_probabilities)
+
+# Combine all attribute results into one data frame
+all_probabilities <- list(
+  Brands = brand_probabilities,
+  Type = Type_probabilities,
+  Rolling = rolling_probabilities,
+  Grip = grip_probabilities,
+  Test = test_probabilities,
+  Review = review_probabilities,
+  Longevity = longevity_probabilities
+)
+
+# Convert to a single data frame
+combined_probabilities <- do.call(rbind, lapply(names(all_probabilities), function(attr) {
+  prob_data <- all_probabilities[[attr]]
+  data.frame(
+    Attribute = attr,
+    Level = rownames(prob_data),
+    prob_data
+  )
+}))
+
+# Display combined table
+print(combined_probabilities)
+
+write.csv(combined_probabilities, "combined_choice_probabilities.csv", row.names = FALSE)
+
+# Subset brand probabilities
+brand_probabilities_long <- data.frame(
+  Brand = rownames(brand_probabilities),
+  ChoiceShare = brand_probabilities[, "choice share"]
+)
+View(brand_probabilities)
+# Combine all attribute probabilities into one dataframe
+all_attributes_probabilities <- rbind(
+  data.frame(Attribute = "Type", Level = rownames(Type_probabilities), Type_probabilities),
+  data.frame(Attribute = "Rolling Resistance", Level = rownames(rolling_probabilities), rolling_probabilities),
+  data.frame(Attribute = "Grip", Level = rownames(grip_probabilities), grip_probabilities),
+  data.frame(Attribute = "Test", Level = rownames(test_probabilities), test_probabilities),
+  data.frame(Attribute = "Review", Level = rownames(review_probabilities), review_probabilities),
+  data.frame(Attribute = "Longevity", Level = rownames(longevity_probabilities), longevity_probabilities)
+)
+
+# Convert to long format for ggplot
+library(reshape2)
+all_attributes_long <- melt(all_attributes_probabilities, 
+                            id.vars = c("Attribute", "Level"), 
+                            measure.vars = "choice.share",
+                            variable.name = "Metric", 
+                            value.name = "Value")
+
+# Combine all attribute probabilities into one data frame
+all_attributes_probabilities <- rbind(
+  data.frame(Attribute = "Type", Level = rownames(type_probabilities), choice.share = Type_probabilities$choice.share),
+  data.frame(Attribute = "Rolling Resistance", Level = rownames(rolling_probabilities), choice.share = rolling_probabilities$choice.share),
+  data.frame(Attribute = "Grip", Level = rownames(grip_probabilities), choice.share = grip_probabilities$choice.share),
+  data.frame(Attribute = "Test", Level = rownames(test_probabilities), choice.share = test_probabilities$choice.share),
+  data.frame(Attribute = "Review", Level = rownames(review_probabilities), choice.share = review_probabilities$choice.share),
+  data.frame(Attribute = "Longevity", Level = rownames(longevity_probabilities), choice.share = longevity_probabilities$choice.share)
+)
+
+# Ensure all data frames have proper row names and "choice.share" column before rbind
+str(all_attributes_probabilities)
+
+# Convert to long format
+library(reshape2)
+all_attributes_long <- melt(all_attributes_probabilities, 
+                            id.vars = c("Attribute", "Level"), 
+                            measure.vars = "choice.share",
+                            variable.name = "Metric", 
+                            value.name = "Value")
+
+# Check structure after melting
+str(all_attributes_long)
+
+# Load ggplot2
+library(ggplot2)
+
+# Create the graph
+ggplot(all_attributes_long, aes(x = Level, y = Value, fill = Attribute)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~ Attribute, scales = "free_x", ncol = 2) +
+  labs(title = "Choice Shares Across Attributes (Excluding Brands)",
+       x = "Attribute Levels",
+       y = "Choice Share") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_legend(title = "Attributes"))
+
+# Save the graph
+ggsave("choice_shares_all_attributes.png", width = 12, height = 8, dpi = 300)
+
+#Defining Baseline for categorical attributes (brand, review & tes
+
+# Remove baseline attributes from X for all respondents
+for (i in seq_along(E_Data_c$lgtdata)) {
+  E_Data_c$lgtdata[[i]]$X <- E_Data_c$lgtdata[[i]]$X[, -c(2, 26, 31)]   # Remove 'michelin', 'rev_1star', 'test_1star'
+}
+# Fit a linear model using your dataset to check for multicollinierity
+lm_model <- lm(price ~ ., data = as.data.frame(E_Data_c$lgtdata[[1]]$X))
+
+# Calculate VIF for each variable in the model to check for multicollinierity
+vif_values <- vif(lm_model)
+
+# View the VIF values to check for multicollinierity
+print(vif_values)
+
+# Combine all respondents' X and y into single datasets
+X_all <- do.call(rbind, lapply(E_Data_c$lgtdata, function(respondent) respondent$X))
+y_all <- unlist(lapply(E_Data_c$lgtdata, function(respondent) respondent$y))
+View(X_all)
+# Convert X_all to a dataframe for easy manipulation
+X_all_df <- as.data.frame(X_all)
+
+# Add the choice column to the dataset
+X_all_df$choice <- y_all
+
+# Exclude the price column (assume price is the first column)
+X_all_df <- X_all_df[, -which(colnames(X_all_df) == "price")]
+
+# Load the car package
+library(car)
+
+# Fit a linear model using your dataset
+ols_model <- lm(choice ~ ., data = X_all_df)
+
+# Calculate VIF for each variable in the model
+vif_values <- vif(ols_model)
+
+# View the VIF values
+print(vif_values)
+
+# Linear Model after baseline  
+ols_model <- lm(choice ~ ., data = X_all_df)
+
+# View the summary of the regression model
+summary(ols_model)
+
+# Calculate VIF for each variable in the model again to check multicollinierity
+vif_values <- vif(ols_model)
+
+# View the VIF values
+print(vif_values)
+
+# Extract coefficients for reporting
+ols_coefficients <- summary(ols_model)$coefficients
+print(ols_coefficients)
+
+# Load the package
+library(mclogit)
+
+# Combine X_all (attributes) and y_all (choices) into one data frame
+X_all_df <- as.data.frame(X_all)
+X_all_df$choice <- y_all  # Add the choice column
+X_all_df$id <- rep(1:(nrow(X_all) / E_Data_c$p), each = E_Data_c$p)  # Respondent ID
+X_all_df$alt <- rep(1:E_Data_c$p, times = nrow(X_all) / E_Data_c$p)  # Alternative ID
+View(X_all)
+#Multinomial Logit Model Analysis
+out_logit <- mclogit(
+  cbind(choice, id) ~ 
+    price   +
+  kleber +
+    bfgoodrich +
+    firestone +
+    hankook +
+    `low_price-brand` +
+    comfort_type +
+    sports_type +
+    min_4thou_km +
+    stand_longevity_km +
+    plus_4thou_km +
+    plus_8thou_km +
+    fuel_eff_B +
+    fuel_eff_C +
+    fuel_eff_E +
+    fuel_eff_F +
+    grip_wet_B +
+    grip_wet_C +
+    grip_wet_E +
+    grip_wet_F +
+    rev_2star +
+    rev_4star  +
+    test_2star ++test_5star,
+  data = X_all_df
+)
+
+# Summarize the model results
+summary(out_logit)
+
+#Predicted Probability of alternatives using MClogit
+Brands = matrix(c(
+  1, 0, 0, 0, 0, 0, 0, 0,  # Continental
+  0, 1, 0, 0, 0, 0, 0, 0,  # Goodyear
+  0, 0, 1, 0, 0, 0, 0, 0,  # Bridgestone
+  0, 0, 0, 1, 0, 0, 0, 0,  # Pirelli
+  0, 0, 0, 0, 1, 0, 0, 0,  # Kleber
+  0, 0, 0, 0, 0, 1, 0, 0,  # BFGoodrich
+  0, 0, 0, 0, 0, 0, 1, 0,  # Firestone
+  0, 0, 0, 0, 0, 0, 0, 1,  # Hankook
+  0, 0, 0, 0, 0, 0, 0, 0   # Baseline: low_price-brand
+), byrow = TRUE, ncol = 8)
+rownames(Brands) <- c("continental", "goodyear", "bridgestone", "pirelli", "kleber", "bfgoodrich", "firestone", "hankook", "low_price-brand")
+colnames(Brands) <- rownames(Brands)[1:8]  # Exclude the baseline from column names
+# Brands Matrix (Baseline: low_price-brand)
+Brands <- matrix(c(
+  1, 0, 0, 0, 0, 0, 0, 0, 0,  # Continental
+  0, 1, 0, 0, 0, 0, 0, 0, 0,  # Goodyear
+  0, 0, 1, 0, 0, 0, 0, 0, 0,  # Bridgestone
+  0, 0, 0, 1, 0, 0, 0, 0, 0,  # Pirelli
+  0, 0, 0, 0, 1, 0, 0, 0, 0,  # Kleber
+  0, 0, 0, 0, 0, 1, 0, 0, 0,  # BFGoodrich
+  0, 0, 0, 0, 0, 0, 1, 0, 0,  # Firestone
+  0, 0, 0, 0, 0, 0, 0, 1, 0   # Hankook
+), byrow = TRUE, ncol = 9)
+
+# Set row and column names
+rownames(Brands) <- c("continental", "goodyear", "bridgestone", "pirelli", "kleber", "bfgoodrich", "firestone", "hankook")
+colnames(Brands) <- c("continental", "goodyear", "bridgestone", "pirelli", "kleber", "bfgoodrich", "firestone", "hankook", "low_price-brand")
+# Print Brands Matrix
+print(Brands)
+
+
+Type = matrix(c(
+  1,  # comfort_type
+  0   # Baseline: sports_type
+), byrow = TRUE, ncol = 1)
+# Type Matrix (Baseline: sports_type)
+Type <- matrix(c(
+  1, 0  # comfort_type
+), byrow = TRUE, nrow = 1)
+View(X_all_df)
+# Set row and column names
+rownames(Type) <- c("comfort_type", "sports_type")
+colnames(Type) <- "comfort_type"  # The non-baseline column
+rownames(Type) <- c("comfort_type")  # Only the non-baseline level as a row
+colnames(Type) <- c("comfort_type", "sports_type")  # Include baseline in the column names
+# Example: Encoding 'type' column from X_all_df
+Type <- model.matrix(~ type - 1, data = X_all_df)
+
+# Print the Type matrix
+print(Type)
+
+# Longevity Matrix (Baseline: min_4thou_km)
+Longevity <- matrix(c(
+  1, 0, 0,  # stand_longevity_km
+  0, 1, 0,   # plus_4thou_km
+  0, 0, 1,   # plus_8thou_km
+  0, 0, 0    # Baseline: min_4k_km
+), byrow = TRUE, ncol = 3)
+
+# This is the corrected second matrix definition:
+Longevity2 <- matrix(c(
+  0, 1, 0, 0,  # stand_longevity_km
+  0, 0, 1, 0,  # plus_4thou_km
+  0, 0, 0, 1   # plus_8thou_km
+), byrow = TRUE, ncol = 4)
+
+# Print the matrices to check the result
+print(Longevity)
+print(Longevity2)
+
+# Set row and column names for Longevity
+rownames(Longevity) <- c("stand_longevity_km", "plus_4thou_km", "plus_8thou_km", "min_4k_km")
+colnames(Longevity) <- c("stand_longevity_km", "plus_4thou_km", "plus_8thou_km")
+
+# Set row and column names for Longevity2 (non-baseline levels as rows)
+rownames(Longevity2) <- c("stand_longevity_km", "plus_4thou_km", "plus_8thou_km")
+colnames(Longevity2) <- c("min_4thou_km", "stand_longevity_km", "plus_4thou_km", "plus_8thou_km")
+
+# Print the matrices with row and column names
+print(Longevity)
+print(Longevity2)
+
+# Rolling Matrix (Baseline: fuel_eff_B)
+Rolling <- matrix(c(
+  1, 0, 0,  # fuel_eff_C
+  0, 1, 0,  # fuel_eff_E
+  0, 0, 1,  # fuel_eff_F
+  0, 0, 0   # Baseline: fuel_eff_B
+), byrow = TRUE, ncol = 3)
+
+# Set row and column names for Rolling
+rownames(Rolling) <- c("fuel_eff_C", "fuel_eff_E", "fuel_eff_F", "fuel_eff_B")
+colnames(Rolling) <- c("fuel_eff_C", "fuel_eff_E", "fuel_eff_F")
+
+# Print the Rolling matrix
+print(Rolling)
+
+# Grip Matrix (Baseline: grip_wet_B)
+Grip <- matrix(c(
+  1, 0, 0,  # grip_wet_C
+  0, 1, 0,  # grip_wet_E
+  0, 0, 1,  # grip_wet_F
+  0, 0, 0   # Baseline: grip_wet_B
+), byrow = TRUE, ncol = 3)
+
+# Set row and column names for Grip
+rownames(Grip) <- c("grip_wet_C", "grip_wet_E", "grip_wet_F", "grip_wet_B")
+colnames(Grip) <- c("grip_wet_C", "grip_wet_E", "grip_wet_F")
+
+# Print the Grip matrix
+print(Grip)
+
+# Longevity Matrix (Baseline: min_4thou_km)
+Longevity <- matrix(c(
+  1, 0, 0,  # stand_longevity_km
+  0, 1, 0,   # plus_4thou_km
+  0, 0, 1,   # plus_8thou_km
+  0, 0, 0    # Baseline: min_4k_km
+), byrow = TRUE, ncol = 3)
+
+# This is the corrected second matrix definition:
+Longevity2 <- matrix(c(
+  0, 1, 0, 0,  # stand_longevity_km
+  0, 0, 1, 0,  # plus_4thou_km
+  0, 0, 0, 1   # plus_8thou_km
+), byrow = TRUE, ncol = 4)
+
+# Print the matrices to check the result
+print(Longevity)
+print(Longevity2)
+
+# Set row and column names for Longevity
+rownames(Longevity) <- c("stand_longevity_km", "plus_4thou_km", "plus_8thou_km", "min_4k_km")
+colnames(Longevity) <- c("stand_longevity_km", "plus_4thou_km", "plus_8thou_km")
+
+# Set row and column names for Longevity2 (non-baseline levels as rows)
+rownames(Longevity2) <- c("stand_longevity_km", "plus_4thou_km", "plus_8thou_km")
+colnames(Longevity2) <- c("min_4thou_km", "stand_longevity_km", "plus_4thou_km", "plus_8thou_km")
+
+# Print the matrices with row and column names
+print(Longevity)
+print(Longevity2)
+
+# Grip Matrix (Baseline: grip_wet_B)
+Grip <- matrix(c(
+  1, 0, 0,  # grip_wet_C
+  0, 1, 0,  # grip_wet_E
+  0, 0, 1,  # grip_wet_F
+  0, 0, 0   # Baseline: grip_wet_B
+), byrow = TRUE, ncol = 3)
+
+# Set row and column names for Grip
+rownames(Grip) <- c("grip_wet_C", "grip_wet_E", "grip_wet_F", "grip_wet_B")
+colnames(Grip) <- c("grip_wet_C", "grip_wet_E", "grip_wet_F")
+
+# Print the Grip matrix
+print(Grip)
+
+# Review Matrix (Baseline: rev_2star)
+Review <- matrix(c(
+  1, 0, 0,  # rev_3star
+  0, 1, 0,  # rev_4star
+  0, 0, 1,  # rev_5star
+  0, 0, 0   # Baseline: rev_2star
+), byrow = TRUE, ncol = 3)
+
+# Set row and column names for Review matrix
+rownames(Review) <- c("rev_3star", "rev_4star", "rev_5star", "rev_2star")
+colnames(Review) <- c("rev_3star", "rev_4star", "rev_5star")
+
+# Print the Review matrix
+print(Review)
+
+
+# Test Matrix (Baseline: test_2star)
+Test <- matrix(c(
+  1, 0, 0,  # test_3star
+  0, 1, 0,  # test_4star
+  0, 0, 1,  # test_5star
+  0, 0, 0   # Baseline: test_2star
+), byrow = TRUE, ncol = 3)
+
+# Set row and column names for Test matrix
+rownames(Test) <- c("test_3star", "test_4star", "test_5star", "test_2star")
+colnames(Test) <- c("test_3star", "test_4star", "test_5star")
+
+# Print the Test matrix
+print(Test)
+
+# Define price values for the alternatives
+alt_prices <- c(5.5, 3.0, 7.6)  # Example prices corresponding to your summary statistics
+# Define alternatives using the attribute matrices
+alt1 <- c(
+  price = alt_prices[1],
+  Brands["goodyear", ],
+  Type["comfort_type", ],
+  Longevity["stand_longevity_km",],
+  Rolling[ "fuel_eff_E",],
+  Grip["grip_wet_E",],
+  Review["rev_4star",],
+  Test["test_5star",]
+)
+alt2 <- c(
+  price = alt_prices[2],
+  Brands["bridgestone", ],
+  Type["comfort_type", ],
+  Longevity["plus_4thou_km",],
+  Rolling["fuel_eff_F",],
+  Grip["grip_wet_F",],
+  Review["rev_5star",],
+  Test["test_4star",]
+)
+alt3 <- c(
+  price = alt_prices[3],
+  Brands["kleber", ],
+  Type["comfort_type", ],
+  Longevity["plus_8thou_km",],
+  Rolling["fuel_eff_C",],
+  Grip["grip_wet_C",],
+  Review["rev_3star",],
+  Test["test_3star",]
+)
+# Outside option (all zeros, representing no selection from defined alternatives)
+alt_outside <- numeric(length(out_logit$coefficients))
+View(alt_outside)
+
+# Define matrices (example values; replace with actual data)
+Brands <- matrix(c(1, 0, 0), nrow = 3, dimnames = list(c("goodyear", "bridgestone", "kleber"), NULL))
+Type <- matrix(c(1, 0), nrow = 2, dimnames = list(c("comfort_type", "sport_type"), NULL))
+Longevity <- matrix(c(1, 0, 0), nrow = 3, dimnames = list(c("stand_longevity_km", "plus_4thou_km", "plus_8thou_km"), NULL))
+Rolling <- matrix(c(1, 0, 0), nrow = 3, dimnames = list(c("fuel_eff_C", "fuel_eff_E", "fuel_eff_F"), NULL))
+Grip <- matrix(c(1, 0, 0), nrow = 3, dimnames = list(c("grip_wet_C", "grip_wet_E", "grip_wet_F"), NULL))
+Review <- matrix(c(1, 0, 0), nrow = 3, dimnames = list(c("rev_3star", "rev_4star", "rev_5star"), NULL))
+Test <- matrix(c(1, 0, 0), nrow = 3, dimnames = list(c("test_3star", "test_4star", "test_5star"), NULL))
+
+# Define price values for the alternatives
+alt_prices <- c(5.5, 3.0, 7.6)
+
+# Define alternatives
+alt1 <- c(
+  price = alt_prices[1],
+  Brands["goodyear", ],
+  Type["comfort_type", ],
+  Longevity["stand_longevity_km", ],
+  Rolling["fuel_eff_E", ],
+  Grip["grip_wet_E", ],
+  Review["rev_4star", ],
+  Test["test_5star", ]
+)
+
+alt2 <- c(
+  price = alt_prices[2],
+  Brands["bridgestone", ],
+  Type["comfort_type", ],
+  Longevity["plus_4thou_km", ],
+  Rolling["fuel_eff_F", ],
+  Grip["grip_wet_F", ],
+  Review["rev_5star", ],
+  Test["test_4star", ]
+)
+
+alt3 <- c(
+  price = alt_prices[3],
+  Brands["kleber", ],
+  Type["comfort_type", ],
+  Longevity["plus_8thou_km", ],
+  Rolling["fuel_eff_C", ],
+  Grip["grip_wet_C", ],
+  Review["rev_3star", ],
+  Test["test_3star", ]
+)
+
+# Define outside option
+alt_outside <- numeric(length(out_logit$coefficients))
+
+# View the outside option (works in RStudio)
+View(alt_outside)
+
+# Load required libraries
+library(ggplot2)
+library(reshape2)
+
+# Load the dataset (assumes E_Data_c is defined in the TyresCSCC.R file)
+# Assuming `E_Data_c` and its components (`lgtdata`) are pre-loaded
+X_all <- do.call(rbind, lapply(E_Data_c$lgtdata, function(respondent) respondent$X))
+y_all <- unlist(lapply(E_Data_c$lgtdata, function(respondent) respondent$y))
+p <- E_Data_c$p
+
+# Define the mixed logit function
+comprobs <- function(X, betap, Vbeta, N) {
+  probs <- matrix(double(N * nrow(X)), nrow = N)
+  
+  if (N > 1) {
+    betai <- betap + t(chol(Vbeta)) %*% matrix(rnorm(N * ncol(X)), ncol = N)
+  } else {
+    betai <- matrix(betap, ncol = 1)
+  }
+  
+  for (i in 1:N) {
+    lmax <- log(max(exp(X %*% betai[, i])))
+    logsume <- lmax + log(sum(exp(X %*% betai[, i] - lmax)))
+    probs[i, ] <- exp((X %*% betai[, i]) - logsume)
+  }
+  
+  return(probs)
+}
+
+# Define attribute matrices (customized to TyresCSCC attributes)
+Brands <- matrix(c(1, 0, 0, 0, 1, 0, 0, 0, 1), nrow = 3, byrow = TRUE)
+Type <- matrix(c(1, 0), nrow = 2, byrow = TRUE)
+Longevity <- matrix(c(1, 0, 0), nrow = 3, byrow = TRUE)
+Rolling <- matrix(c(1, 0, 0), nrow = 3, byrow = TRUE)
+Grip <- matrix(c(1, 0, 0), nrow = 3, byrow = TRUE)
+Review <- matrix(c(1, 0, 0), nrow = 3, byrow = TRUE)
+Test <- matrix(c(1, 0, 0), nrow = 3, byrow = TRUE)
+
+# Define price values for alternatives
+alt_prices <- c(5.5, 3.0, 7.6)
+
+# Define alternatives based on attributes and prices
+alt1 <- c(price = alt_prices[1], Brands[1, ], Type[1, ], Longevity[1, ], 
+          Rolling[2, ], Grip[2, ], Review[2, ], Test[3, ])
+alt2 <- c(price = alt_prices[2], Brands[2, ], Type[1, ], Longevity[2, ], 
+          Rolling[3, ], Grip[3, ], Review[3, ], Test[2, ])
+alt3 <- c(price = alt_prices[3], Brands[3, ], Type[1, ], Longevity[3, ], 
+          Rolling[1, ], Grip[1, ], Review[1, ], Test[1, ])
+alt_outside <- numeric(length(alt1))
+
+print(dim(choiceset))      # Rows = alternatives, Columns = attributes
+print(length(betap))       # Should match ncol(choiceset)
+print(names(alt1))         # Attribute names
+print(names(alt2))
+print(names(alt3))
+print(names(alt_outside))
+# Align attributes across alternatives
+names(alt_outside) <- names(alt1)  # Ensure same names for all alternatives
+choiceset <- rbind(alt1, alt2, alt3, alt_outside)
+choiceset <- as.matrix(choiceset)  # Convert to matrix for computation
+print(dim(choiceset))      # Number of rows and columns
+print(length(betap))       # Should match ncol(choiceset)
+# Example: Define alternatives
+alt1 <- c(price = 5.5, Brands = 1, Type = 0, Longevity = 1, Rolling = 0, Grip = 1, Review = 0, Test = 1)
+alt2 <- c(price = 3.0, Brands = 0, Type = 1, Longevity = 0, Rolling = 1, Grip = 0, Review = 1, Test = 0)
+alt3 <- c(price = 7.6, Brands = 0, Type = 0, Longevity = 1, Rolling = 0, Grip = 0, Review = 1, Test = 1)
+alt_outside <- numeric(length(alt1))  # All zeros for outside option
+
+# Align names across alternatives
+names(alt_outside) <- names(alt1)
+
+# Construct choiceset
+choiceset <- rbind(alt1, alt2, alt3, alt_outside)
+choiceset <- as.matrix(choiceset)
+
+# Parameters
+betap <- c(1.5, 1.5, -1, 0, 0, 0, 0, 0)  # Include all attributes in betap
+Vbeta <- diag(length(betap))  # Example variance-covariance matrix
+
+# Check dimensions
+print(dim(choiceset))       # Should match length(betap)
+print(length(betap))        # Should match ncol(choiceset)
+
+# Compute probabilities
+probsN1 <- comprobs(choiceset, betap, Vbeta, 1)
+probsNlarge <- comprobs(choiceset, betap, Vbeta, 90000)
+
+# Output
+print(probsN1)
+print(head(probsNlarge))
+
+
+# Analyze attribute-level probabilities
+brand_range <- 2:11
+brand_probabilities <- countattribute(X_all, y_all, p, brand_range)
+
+# Visualization of probabilities
+windows()
+par(mfrow = c(2, 2))
+hist(probsNlarge[, 1], breaks = 40, main = "Alternative 1 Probability")
+abline(v = mean(probsNlarge[, 1]), col = "green", lwd = 2)
+hist(probsNlarge[, 2], breaks = 40, main = "Alternative 2 Probability")
+abline(v = mean(probsNlarge[, 2]), col = "green", lwd = 2)
+
+# Print choice probabilities
+print(round(probsN1, digits = 2))
+print(round(colMeans(probsNlarge), digits = 2))
+
+# Combine probabilities into a single data frame for export
+combined_probabilities <- data.frame(
+  Alternative = c("Alt1", "Alt2", "Alt3", "Outside"),
+  Prob_Logit = probsN1,
+  Prob_MixedLogit = colMeans(probsNlarge)
+)
+
+# Save to CSV
+write.csv(combined_probabilities, "choice_probabilities.csv", row.names = FALSE)
+
+# Summary
+print("Choice Probabilities Successfully Computed and Visualized!")
