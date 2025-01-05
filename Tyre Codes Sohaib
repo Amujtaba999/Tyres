@@ -1,0 +1,810 @@
+# loading the dataset
+ls(E_Data_c)
+
+#Choice Share Calculation
+countshare <- function(Xmat, yl, p, target) {
+  nchoice <- nrow(Xmat) / p  # Total number of choice tasks
+  neffect <- ncol(Xmat)      # Total number of attributes
+  Xar <- array(t(Xmat), dim = c(neffect, p, nchoice))  # 3D array for attributes
+  yar <- array(yl, dim = c(p, nchoice))  # 2D array for choices
+  
+  countex <- 0  # Count exposures
+  countch <- 0  # Count choices
+  
+  for (i in 1:nchoice) {  # Loop through each choice task
+    X <- t(Xar[,,i])  # Attributes matrix for the task
+    y <- yar[,i]      # Choices vector for the task
+    
+    if (sum(X[, target]) > 0) {  # Check if the level is presented
+      countex <- countex + 1  # Increment exposure counter
+      if (any(X[y == 1, target] == 1)) {  # Check if the level was chosen
+        countch <- countch + 1  # Increment choice counter
+      }
+    }
+  }
+  
+  return(c(countch / countex, countch, countex))  # Choice share, #choices, #exposures
+}
+
+
+# Function to compute probabilities for a range of attribute-levels
+countattribute <- function(Xmat, yl, p, attributerange) {
+  out <- matrix(0, nrow = length(attributerange), ncol = 3)  # Initialize output matrix
+  counter <- 0
+  
+  for (r in attributerange) {  # Loop through attribute range
+    counter <- counter + 1
+    out[counter, ] <- countshare(Xmat, yl, p, r)
+  }
+  
+  rownames(out) <- colnames(Xmat)[attributerange]  # Set row names as attribute names
+  colnames(out) <- c('choice share', '# choices', '# exposures')  # Set column names
+  
+  return(out)
+}
+
+
+# Apply the functions to your dataset
+# Use E_Data_c$lgtdata and combine results across respondents
+X_all <- do.call(rbind, lapply(E_Data_c$lgtdata, function(respondent) respondent$X))
+y_all <- unlist(lapply(E_Data_c$lgtdata, function(respondent) respondent$y))
+p <- E_Data_c$p
+
+# Example: Calculate choice probabilities for brands
+brand_range <- 2:11  # Assuming columns 2 to 10 correspond to brands
+brand_probabilities <- countattribute(X_all, y_all, p, brand_range)
+
+# View results
+print(brand_probabilities)
+
+# Example: Calculate choice probabilities for type
+Type <- 12:13  # Assuming columns 11 to 12 correspond to brands
+Type_probabilities <- countattribute(X_all, y_all, p, Type)
+
+
+# View results
+print(Type_probabilities)
+
+# Example: Calculate choice probabilities for rolling
+rolling <- 18:21  # Assuming columns 11 to 12 correspond to brands
+rolling_probabilities <- countattribute(X_all, y_all, p, rolling)
+
+# View results
+print(rolling_probabilities)
+
+# Example: Calculate choice probabilities for grip
+grip <- 22:25  # Assuming columns 11 to 12 correspond to brands
+grip_probabilities <- countattribute(X_all, y_all, p, grip)
+
+# View results
+print(grip_probabilities)
+
+
+# Example: Calculate choice probabilities for test
+test <- 31:35  # Assuming columns 11 to 12 correspond to brands
+test_probabilities <- countattribute(X_all, y_all, p, test)
+
+# View results
+print(test_probabilities)
+
+
+# Example: Calculate choice probabilities for review attributes
+review_range <- 26:30  # Assuming columns 25 to 28 correspond to review attributes
+review_probabilities <- countattribute(X_all, y_all, p, review_range)
+
+# View results
+print(review_probabilities)
+
+# Example: Calculate choice probabilities for longevity attributes
+longevity_range <- 14:17  # Assuming columns 13 to 16 correspond to longevity attributes
+longevity_probabilities <- countattribute(X_all, y_all, p, longevity_range)
+
+# View results
+print(longevity_probabilities)
+
+# Combine all attribute results into one data frame
+all_probabilities <- list(
+  Brands = brand_probabilities,
+  Type = Type_probabilities,
+  Rolling = rolling_probabilities,
+  Grip = grip_probabilities,
+  Test = test_probabilities,
+  Review = review_probabilities,
+  Longevity = longevity_probabilities
+)
+
+# Convert to a single data frame
+combined_probabilities <- do.call(rbind, lapply(names(all_probabilities), function(attr) {
+  prob_data <- all_probabilities[[attr]]
+  data.frame(
+    Attribute = attr,
+    Level = rownames(prob_data),
+    prob_data
+  )
+}))
+
+# Display combined table
+print(combined_probabilities)
+
+write.csv(combined_probabilities, "combined_choice_probabilities.csv", row.names = FALSE)
+
+# Subset brand probabilities
+brand_probabilities_long <- data.frame(
+  Brand = rownames(brand_probabilities),
+  ChoiceShare = brand_probabilities[, "choice share"]
+)
+
+# Combine all attribute probabilities into one dataframe
+all_attributes_probabilities <- rbind(
+  data.frame(Attribute = "Type", Level = rownames(Type_probabilities), Type_probabilities),
+  data.frame(Attribute = "Rolling Resistance", Level = rownames(rolling_probabilities), rolling_probabilities),
+  data.frame(Attribute = "Grip", Level = rownames(grip_probabilities), grip_probabilities),
+  data.frame(Attribute = "Test", Level = rownames(test_probabilities), test_probabilities),
+  data.frame(Attribute = "Review", Level = rownames(review_probabilities), review_probabilities),
+  data.frame(Attribute = "Longevity", Level = rownames(longevity_probabilities), longevity_probabilities)
+)
+
+# Convert to long format for ggplot
+library(reshape2)
+all_attributes_long <- melt(all_attributes_probabilities, 
+                            id.vars = c("Attribute", "Level"), 
+                            measure.vars = "choice.share",
+                            variable.name = "Metric", 
+                            value.name = "Value")
+
+# Load ggplot2
+library(ggplot2)
+
+# Create the graph
+ggplot(all_attributes_long, aes(x = Level, y = Value, fill = Attribute)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~ Attribute, scales = "free_x", ncol = 2) +
+  labs(title = "Choice Shares Across Attributes (Excluding Brands)",
+       x = "Attribute Levels",
+       y = "Choice Share") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_legend(title = "Attributes"))
+
+# Save the graph
+ggsave("choice_shares_all_attributes.png", width = 12, height = 8, dpi = 300)
+
+package(carData)
+# Load the car package
+library(car)
+
+# Fit a linear model using your dataset
+lm_model <- lm(price ~ ., data = as.data.frame(E_Data_c$lgtdata[[1]]$X))
+
+# Calculate VIF for each variable in the model
+vif_values <- vif(lm_model)
+
+# View the VIF values
+print(vif_values)
+#Defining Baseline for categorical attributes (brand, review & tes
+
+# Remove baseline attributes from X for all respondents
+for (i in seq_along(E_Data_c$lgtdata)) {
+  E_Data_c$lgtdata[[i]]$X <- E_Data_c$lgtdata[[i]]$X[, -c(2, 26, 31)]   # Remove 'michelin', 'rev_1star', 'test_1star'
+}
+# Fit a linear model using your dataset to check for multicollinierity
+lm_model <- lm(price ~ ., data = as.data.frame(E_Data_c$lgtdata[[1]]$X))
+
+# Calculate VIF for each variable in the model to check for multicollinierity
+vif_values <- vif(lm_model)
+
+# View the VIF values to check for multicollinierity
+print(vif_values)
+
+# Combine all respondents' X and y into single datasets
+X_all <- do.call(rbind, lapply(E_Data_c$lgtdata, function(respondent) respondent$X))
+y_all <- unlist(lapply(E_Data_c$lgtdata, function(respondent) respondent$y))
+
+# Convert X_all to a dataframe for easy manipulation
+X_all_df <- as.data.frame(X_all)
+View(X_all_df)
+# Add the choice column to the dataset
+X_all_df$choice <- y_all
+
+# Exclude the price column (assume price is the first column)
+X_all_df <- X_all_df[, -which(colnames(X_all_df) == "price")]
+
+# Load the car package
+library(car)
+
+# Fit a linear model using your dataset
+ols_model <- lm(choice ~ ., data = X_all_df)
+
+# Calculate VIF for each variable in the model
+vif_values <- vif(ols_model)
+
+# View the VIF values
+print(vif_values)
+
+# Linear Model after baseline  
+ols_model <- lm(choice ~ ., data = X_all_df)
+
+# View the summary of the regression model
+summary(ols_model)
+
+# Calculate VIF for each variable in the model again to check multicollinierity
+vif_values <- vif(ols_model)
+
+# View the VIF values
+print(vif_values)
+
+# Extract coefficients for reporting
+ols_coefficients <- summary(ols_model)$coefficients
+print(ols_coefficients)
+
+# Load the package
+library(mclogit)
+
+# Combine X_all (attributes) and y_all (choices) into one data frame
+X_all_df <- as.data.frame(X_all)
+X_all_df$choice <- y_all  # Add the choice column
+X_all_df$id <- rep(1:(nrow(X_all) / E_Data_c$p), each = E_Data_c$p)  # Respondent ID
+X_all_df$alt <- rep(1:E_Data_c$p, times = nrow(X_all) / E_Data_c$p)  # Alternative ID
+
+#Multinomial Logit Model Analysis
+out_logit <- mclogit(
+  cbind(choice, id) ~ 
+    price + continental +
+    goodyear +
+    bridgestone +
+    pirelli +
+    kleber +
+    bfgoodrich +
+    firestone +
+    hankook +
+    `low_price-brand` +
+    comfort_type +
+    sports_type +
+    min_4thou_km +
+    stand_longevity_km +
+    plus_4thou_km +
+    plus_8thou_km +
+    fuel_eff_B +
+    fuel_eff_C +
+    fuel_eff_E +
+    fuel_eff_F +
+    grip_wet_B +
+    grip_wet_C +
+    grip_wet_E +
+    grip_wet_F +
+    rev_2star +
+    rev_3star +
+    rev_4star +
+    rev_5star +
+    test_2star +
+    test_3star +
+    test_4star +
+    test_5star,
+  data = X_all_df
+)
+
+# Summarize the model results
+summary(out_logit)
+
+# Brands Matrix (Baseline: low_price-brand)
+Brands <- matrix(c(
+  1, 0, 0, 0, 0, 0, 0, 0, 0,  # Continental
+  0, 1, 0, 0, 0, 0, 0, 0, 0,  # Goodyear
+  0, 0, 1, 0, 0, 0, 0, 0, 0,  # Bridgestone
+  0, 0, 0, 1, 0, 0, 0, 0, 0,  # Pirelli
+  0, 0, 0, 0, 1, 0, 0, 0, 0,  # Kleber
+  0, 0, 0, 0, 0, 1, 0, 0, 0,  # BFGoodrich
+  0, 0, 0, 0, 0, 0, 1, 0, 0,  # Firestone
+  0, 0, 0, 0, 0, 0, 0, 1, 0   # Hankook
+), byrow = TRUE, ncol = 9)
+
+# Set row and column names
+rownames(Brands) <- c("continental", "goodyear", "bridgestone", "pirelli", "kleber", "bfgoodrich", "firestone", "hankook")
+colnames(Brands) <- c("continental", "goodyear", "bridgestone", "pirelli", "kleber", "bfgoodrich", "firestone", "hankook", "low_price-brand")
+
+# Print Brands Matrix
+print(Brands)
+
+
+# Type Matrix (Baseline: sports_type)
+Type <- matrix(c(
+  1, 0  # comfort_type
+), byrow = TRUE, nrow = 1)
+
+# Set row and column names
+rownames(Type) <- c("comfort_type")  # Only the non-baseline level as a row
+colnames(Type) <- c("comfort_type", "sports_type")  # Include baseline in the column names
+
+# Print the Type matrix
+print(Type)
+
+# Longevity Matrix (Baseline: min_4thou_km)
+Longevity <- matrix(c(
+  0, 1, 0, 0,  # stand_longevity_km
+  0, 0, 1, 0,  # plus_4thou_km
+  0, 0, 0, 1   # plus_8thou_km
+), byrow = TRUE, nrow = 3)
+
+# Set row and column names
+rownames(Longevity) <- c("stand_longevity_km", "plus_4thou_km", "plus_8thou_km")  # Non-baseline levels as rows
+colnames(Longevity) <- c("min_4thou_km", "stand_longevity_km", "plus_4thou_km", "plus_8thou_km")  # Include baseline in columns
+
+# Print the Longevity matrix
+print(Longevity)
+
+# Rolling Matrix (Baseline: fuel_eff_B)
+Rolling <- matrix(c(
+  0, 1, 0, 0,  # fuel_eff_C
+  0, 0, 1, 0,  # fuel_eff_E
+  0, 0, 0, 1   # fuel_eff_F
+), byrow = TRUE, nrow = 3)
+
+# Set row and column names
+rownames(Rolling) <- c("fuel_eff_C", "fuel_eff_E", "fuel_eff_F")  # Non-baseline levels as rows
+colnames(Rolling) <- c("fuel_eff_B", "fuel_eff_C", "fuel_eff_E", "fuel_eff_F")  # Include baseline in columns
+
+# Print the Rolling matrix
+print(Rolling)
+
+# Grip Matrix (Baseline: grip_wet_B)
+Grip <- matrix(c(
+  0, 1, 0, 0,  # grip_wet_C
+  0, 0, 1, 0,  # grip_wet_E
+  0, 0, 0, 1   # grip_wet_F
+), byrow = TRUE, nrow = 3)
+
+# Set row and column names
+rownames(Grip) <- c("grip_wet_C", "grip_wet_E", "grip_wet_F")  # Non-baseline levels as rows
+colnames(Grip) <- c("grip_wet_B", "grip_wet_C", "grip_wet_E", "grip_wet_F")  # Include baseline as the first column
+
+# Print the Grip matrix
+print(Grip)
+
+# Review Matrix (Baseline: rev_2star)
+Review <- matrix(c(
+  0, 1, 0, 0,  # rev_3star
+  0, 0, 1, 0,  # rev_4star
+  0, 0, 0, 1   # rev_5star
+), byrow = TRUE, nrow = 3)
+
+# Set row and column names
+rownames(Review) <- c("rev_3star", "rev_4star", "rev_5star")  # Non-baseline levels as rows
+colnames(Review) <- c("rev_2star", "rev_3star", "rev_4star", "rev_5star")  # Include baseline as the first column
+
+# Print the Review matrix
+print(Review)
+
+# Test Matrix (Baseline: test_2star)
+Test <- matrix(c(
+  0, 1, 0, 0,  # test_3star
+  0, 0, 1, 0,  # test_4star
+  0, 0, 0, 1   # test_5star
+), byrow = TRUE, nrow = 3)
+
+# Set row and column names
+rownames(Test) <- c("test_3star", "test_4star", "test_5star")  # Non-baseline levels as rows
+colnames(Test) <- c("test_2star", "test_3star", "test_4star", "test_5star")  # Include baseline as the first column
+
+# Print the Test matrix
+print(Test)
+
+
+# Define price values for the alternatives
+alt_prices <- c(5.5, 3.0, 7.6)  # Example prices corresponding to your summary statistics
+
+# Define alternatives using the attribute matrices
+alt1 <- c(
+  price = alt_prices[1],
+  Brands["goodyear", ],
+  Type["comfort_type", ],
+  Longevity["stand_longevity_km",],
+  Rolling[ "fuel_eff_E",],
+  Grip["grip_wet_E",],
+  Review["rev_4star",],
+  Test["test_5star",]
+)
+
+alt2 <- c(
+  price = alt_prices[2],
+  Brands["bridgestone", ],
+  Type["comfort_type", ],
+  Longevity["plus_4thou_km",],
+  Rolling["fuel_eff_F",],
+  Grip["grip_wet_F",],
+  Review["rev_5star",],
+  Test["test_4star",]
+)
+
+alt3 <- c(
+  price = alt_prices[3],
+  Brands["kleber", ],
+  Type["comfort_type", ],
+  Longevity["plus_8thou_km",],
+  Rolling["fuel_eff_C",],
+  Grip["grip_wet_C",],
+  Review["rev_3star",],
+  Test["test_3star",]
+)
+
+# Outside option (all zeros, representing no selection from defined alternatives)
+alt_outside <- numeric(length(out_logit$coefficients))
+
+# Combine into a choice set
+choiceset <- rbind(alt1, alt2, alt3, alt_outside)
+
+# Set column names to match out_logit coefficients
+colnames(choiceset) <- names(out_logit$coefficients)
+
+# Set row names for alternatives
+rownames(choiceset) <- c("alt1", "alt2", "alt3", "outside")
+
+# Print the choiceset
+print(choiceset)
+
+######computing 'counterfactual' choice probabilities given estimates from data######
+
+Xbeta = choiceset %*% out_logit$coefficients
+
+## direct 
+prob_=exp(Xbeta)/sum(exp(Xbeta))
+
+## with numerical stabilization
+Xbetas = Xbeta - max(Xbeta)
+logdenom = log(sum(exp(Xbetas)))
+logprob = Xbetas - logdenom
+prob = exp(logprob)
+
+cbind(choiceset,prob)
+
+# Combine all y vectors
+y_all <- unlist(lapply(E_Data_c$lgtdata, function(respondent_data) respondent_data$y))
+
+# Combine all X matrices
+X_all <- do.call(rbind, lapply(E_Data_c$lgtdata, function(respondent_data) respondent_data$X))
+
+# Verify dimensions
+print(length(y_all))  # Should be (number of respondents) × (tasks per respondent) = 3652 × 15
+print(dim(X_all))     # Should be length(y_all) × number of attributes = 54780 × 32 (after baseline adjustment)
+
+aligned <- nrow(X_all) == length(y_all) * E_Data_c$p
+print(aligned)  # Should return TRUE
+
+#######Mixed Logit (Hierarchical Bayesian) Model########
+
+library(bayesm)
+
+out_HB_covariateswithoutconst <- rhierMnlRwMixture(
+  Data = list(
+    lgtdata = E_Data_c$lgtdata,  # All choice data
+    Z = E_Data_c$Z,             # Covariates
+    p = E_Data_c$p              # Number of alternatives per task
+  ),
+  Prior = list(ncomp = 1),      # No sign constraint applied
+  Mcmc = list(R = 40000, keep = 10)  # 40,000 iterations, thinning every 10
+)
+
+#Verify Convergence of the Model
+windows()
+plot(out_HB_covariateswithoutconst$loglike, type = "l", main = "Log-Likelihood Over Iterations",
+     xlab = "Iterations", ylab = "Log-Likelihood")
+
+# Get the dimensions of beta draws
+print(dim(out_HB_covariateswithoutconst$betadraw))  # Respondents × Attributes × Iterations
+
+# Extract posterior draws
+burn_in <- 1800  # Set burn-in period
+betadraw_converged_w <- out_HB_covariateswithoutconst$betadraw[, , (burn_in + 1):dim(out_HB_covariateswithoutconst$betadraw)[3]]
+
+# Compute posterior means across iterations for each respondent and attribute
+posterior_means_w <- apply(betadraw_converged_w, c(1, 2), mean)  # Respondents × Attributes
+
+summary(posterior_means_w)
+
+#Combine iterations into a single respondent-level array for betaexchange
+betaexchange <- array(
+  aperm(betadraw_converged_w, perm = c(1, 3, 2)),
+  dim = c(dim(betadraw_converged_w)[1] * dim(betadraw_converged_w)[3], dim(betadraw_converged_w)[2])
+)
+
+# Compute the mean and heterogeneity (standard deviation) across respondents
+mpref <- cbind(
+  colMeans(betaexchange),                # Mean preferences for each attribute
+  apply(betaexchange, 2, sd)             # Heterogeneity (SD) of preferences
+)
+
+
+# Assign column names
+colnames(mpref) <- c("Mean Preference", "SD")
+rownames(mpref) <- colnames(E_Data_c$lgtdata[[1]]$X)
+
+# View the results
+print(round(mpref, digits = 3))
+
+
+
+# Compute mean and standard deviation of posterior preferences
+betaexchange <- array(
+  aperm(betadraw_converged_w, perm = c(1, 3, 2)),
+  dim = c(dim(betadraw_converged_w)[1] * dim(betadraw_converged_w)[3], dim(betadraw_converged_w)[2])
+)
+
+# Compute willingness to pay (WTP) in mean money utility units
+comppref <- cbind(mpref[, 1], colMeans(out_Bayes$betadraw))
+compWTP <- round(comppref / -t(array(comppref[nrow(comppref), ], dim = c(2, nrow(comppref)))), digits = 3)
+
+# Plot preference heterogeneity
+windows()
+par(mfcol = c(2, 2))
+plot(density(betaexchange[, 3]), main = coefnames[3], xlab = coefnames[3])
+plot(density(betaexchange[, dim(betaexchange)[2]]), main = coefnames[dim(betaexchange)[2]], xlab = coefnames[dim(betaexchange)[2]])
+smoothScatter(betaexchange[, 3], betaexchange[, dim(betaexchange)[2]], xlab = coefnames[3], ylab = coefnames[dim(betaexchange)[2]])
+
+# Define attributes and levels based on E_Data_c
+Brands <- model.matrix(~ as.factor(1:9) - 1)[, 1:8]
+colnames(Brands) <- colnames(E_Data_c$lgtdata[[1]]$X)[2:9]
+rownames(Brands) <- colnames(Brands)
+
+Type <- model.matrix(~ as.factor(1:2) - 1)[, 1]
+colnames(Type) <- colnames(E_Data_c$lgtdata[[1]]$X)[10]
+rownames(Type) <- colnames(Type)
+
+Longevity <- model.matrix(~ as.factor(1:4) - 1)[, 1:3]
+colnames(Longevity) <- colnames(E_Data_c$lgtdata[[1]]$X)[11:13]
+rownames(Longevity) <- colnames(Longevity)
+
+Rolling <- model.matrix(~ as.factor(1:4) - 1)[, 1:3]
+colnames(Rolling) <- colnames(E_Data_c$lgtdata[[1]]$X)[14:16]
+rownames(Rolling) <- colnames(Rolling)
+
+Grip <- model.matrix(~ as.factor(1:4) - 1)[, 1:3]
+colnames(Grip) <- colnames(E_Data_c$lgtdata[[1]]$X)[17:19]
+rownames(Grip) <- colnames(Grip)
+
+Review <- model.matrix(~ as.factor(1:4) - 1)[, 1:3]
+colnames(Review) <- colnames(E_Data_c$lgtdata[[1]]$X)[20:22]
+rownames(Review) <- colnames(Review)
+
+Test <- model.matrix(~ as.factor(1:4) - 1)[, 1:3]
+colnames(Test) <- colnames(E_Data_c$lgtdata[[1]]$X)[23:25]
+rownames(Test) <- colnames(Test)
+
+# Define price grid
+priceset <- seq(500, 6000, 500)
+priceset <- cbind(priceset, rep(800, length(priceset)))
+
+# Compute demand for hierarchical Bayesian estimates
+outsim_HB <- pricedemand(priceset, choiceset_, betaexchange[runif(nrow(betaexchange)) > .7, ])
+
+# Compute profit-maximizing price
+profitcalc <- function(price, betamix, X, cost, bindex) {
+  X[bindex, dim(X)[2]] <- price
+  share <- probXy(betamix, X)
+  profits <- share$ms * (X[, dim(X)[2]] - cost)
+  return(list(profits = profits, share = share$ms))
+}
+
+out <- optim(par = 1000 / 1000, fn = profitcalchelp, gr = NULL,
+             betamix = betaexchange[runif(nrow(betaexchange)) > .7, ],
+             X = cbind(choiceset_, c(300, 800, 0) / 1000),
+             cost = c(450, 450, 0) / 1000,
+             bindex = 1,
+             hessian = TRUE, control = list(fnscale = -1), method = "Brent", lower = 0, upper = 6000)
+
+outM <- matrix(c(out$par, out$value, out$hessian), ncol = 3)
+colnames(outM) <- c("Optimal Price", "Profit", "Hessian")
+print(outM)
+
+# Additional constraints and estimation
+Rcpp::sourceCpp("rhierMnlRwMixture_rcpp_loop_Sim_modHP.cpp", showOutput = FALSE)
+source('rhierMnlRwMixture_main.R')
+
+load("out_order_R70000keep10.RData")
+
+E_Data_c_R <- E_Data_c
+for (i in seq_along(E_Data_c$lgtdata)) {
+  E_Data_c_R$lgtdata[[i]]$X <- E_Data_c$lgtdata[[i]]$X
+}
+
+coefnames_R <- colnames(E_Data_c$lgtdata[[1]]$X)
+
+nvar_c <- ncol(E_Data_c$lgtdata[[1]]$X)
+Amu <- diag(1/10, nrow = nvar_c, ncol = nvar_c)
+mustarbarc <- matrix(rep(0, nvar_c), nrow = nvar_c)
+nu <- 15 + nvar_c
+V <- nu * diag(nvar_c) * 0.5
+
+Prior <- list(ncomp = 1, Amu = Amu, mustarbarc = mustarbarc, nu = nu, V = V)
+Mcmc <- list(R = 70000, keep = 10)
+
+if (!"out_order" %in% ls()) {
+  out_order <- rhierMnlRwMixture_SR(Data = list(p = p, lgtdata = E_Data_c_R$lgtdata),
+                                    Prior = Prior, Mcmc = Mcmc, nvar_c = nvar_c, flag = "approx")
+}
+
+print(out_order)
+
+Nash Equilibrium
+###################################################################################
+##### ILLUSTRATE NASH COMPUTATIONS ################################################
+###################################################################################
+
+### Settings: Two brands (players), A & B, and an outside good
+
+rm(list = ls())
+
+# Load Required Libraries
+library(MASS)
+library(lattice)
+library(Matrix)
+library(bayesm)
+library(matrixcalc)
+library(ggplot2)
+
+###################################################################################
+##### FUNCTIONS ###################################################################
+###################################################################################
+
+# First-Order Condition (FOC) Function
+FOC <- function(prices, design, beta, costs, FC = FALSE) {
+  fullDesign <- cbind(design, prices)
+  xbeta <- beta %*% t(fullDesign)
+  xbeta <- pmin(pmax(xbeta, -500), 500)  # Correct for underflow and overflow
+  probabilities <- exp(xbeta) / rowSums(exp(xbeta))
+  
+  if (FC) {
+    probabilities <- t(apply(xbeta, 1, function(x) (x == max(x)) * 1))
+  }
+  
+  insideGoods <- which(prices != 0)
+  probsInside <- probabilities[, insideGoods, drop = FALSE]
+  delprofit <- colMeans(probsInside * (1 - probsInside) * beta[, ncol(beta)]) * 
+    (rowSums(prices - costs)[insideGoods]) + colMeans(probsInside)
+  
+  return(delprofit)
+}
+
+# Compute Shares
+computeShares <- function(prices, beta, design, FC = FALSE) {
+  fullDesign <- cbind(design, prices)
+  xbeta <- beta %*% t(fullDesign)
+  max_xbeta <- xbeta[cbind(1:nrow(xbeta), max.col(xbeta))]
+  probabilities <- exp(xbeta - max_xbeta) / rowSums(exp(xbeta - max_xbeta))
+  
+  if (FC) {
+    probabilities <- t(apply(xbeta, 1, function(x) (x == max(x)) * 1))
+  }
+  
+  return(colMeans(probabilities))
+}
+
+# Compute Profits
+computeProfit <- function(design, prices, beta, costs, FC = FALSE, outside = FALSE) {
+  fullDesign <- cbind(design, prices)
+  xbeta <- beta %*% t(fullDesign)
+  max_xbeta <- xbeta[cbind(1:nrow(xbeta), max.col(xbeta))]
+  probabilities <- exp(xbeta - max_xbeta) / rowSums(exp(xbeta - max_xbeta))
+  
+  if (FC) {
+    probabilities <- t(apply(xbeta, 1, function(x) (x == max(x)) * 1))
+  }
+  
+  net_price <- (prices - costs)
+  profits <- colMeans(probabilities) * net_price
+  
+  return(list(profits = profits, demand = colMeans(probabilities)))
+}
+
+# Nash Equilibrium Function
+nashEquilibrium <- function(design, startingPrices, costs, beta, priceRange, grp, FC = FALSE, freeze = NULL) {
+  prices <- as.matrix(startingPrices)
+  tol <- 1e-4
+  maxIter <- 20
+  numIters <- 0
+  path_eq_prices <- list()
+  path_eq_prices[[1]] <- prices
+  
+  while (TRUE) {
+    oldPrices <- prices
+    for (i in seq_len(nrow(prices))) {
+      if (!is.null(freeze) && i %in% freeze) next
+      cp <- function(p) {
+        prices[i, prices[i, ] != 0] <- p
+        sum(computeProfit(design, prices, beta, costs, FC)$profits[grp == grp[i]])
+      }
+      prices[i, prices[i, ] != 0] <- optimize(cp, interval = priceRange[i, ], maximum = TRUE)$maximum
+    }
+    numIters <- numIters + 1
+    path_eq_prices[[numIters + 1]] <- prices
+    
+    if (sum(abs(prices - oldPrices)) < tol || numIters == maxIter) break
+  }
+  
+  return(list(eq_prices = prices[prices != 0], iterations = numIters, path_eq_prices = path_eq_prices))
+}
+
+###################################################################################
+##### MAIN SCRIPT #################################################################
+###################################################################################
+
+# Define Products
+products <- c("michelin", "continental", "goodyear")
+
+runCase <- function(nplayers, nunits, avgbeta, sigma_values, pr_ranges, case_name) {
+  # Generate Draws
+  sigma <- diag(sigma_values, nrow = (nplayers + 1), ncol = (nplayers + 1))
+  betastartemp <- mvrnorm(n = nunits, avgbeta, sigma)
+  
+  # Include Sign Restriction on Price Coefficients
+  beta <- cbind(betastartemp[, 1:nplayers], -exp(betastartemp[, nplayers + 1]))
+  colnames(beta) <- c("Brand A", "Brand B", "price")
+  
+  # Define Design Matrix and Pricing
+  designBase <- rbind(diag(nplayers), rep(0, nplayers))
+  pr_range_mat <- array(pr_ranges, dim = c(nplayers, 2))
+  
+  if (any(pr_ranges <= 0) || any(pr_range_mat[, 1] >= pr_range_mat[, 2])) {
+    stop("Invalid price ranges: Ensure that minimum prices are less than maximum prices.")
+  }
+  
+  startingPrices <- c(pr_range_mat[, 1], 0)
+  costBase <- c(0.1 * pr_range_mat[, 1], 0)
+  grp <- seq(nplayers)
+  
+  # Compute Nash Equilibrium
+  eqBase <- nashEquilibrium(
+    design = designBase, 
+    startingPrices = startingPrices, 
+    costs = costBase, 
+    beta = beta, 
+    priceRange = pr_range_mat, 
+    grp = grp, 
+    FC = FALSE, 
+    freeze = 0
+  )
+  
+  if (length(eqBase$path_eq_prices) < 2) {
+    stop("Equilibrium computation failed to generate a valid path.")
+  }
+  
+  eq_price <- eqBase$eq_prices
+  eq_shares <- computeShares(prices = c(eq_price, 0), beta = beta, design = designBase, FC = FALSE)
+  eq_profits <- computeProfit(prices = c(eq_price, 0), beta = beta, design = designBase, costs = costBase, FC = FALSE)$profits
+  
+  # Create Data Frame for Visualization
+  iter_prices <- do.call(rbind, lapply(eqBase$path_eq_prices, function(x) x[1:nplayers]))
+  iter_df <- data.frame(Iteration = 1:nrow(iter_prices), iter_prices)
+  colnames(iter_df) <- c("Iteration", paste0("Player ", 1:nplayers))
+  
+  if (nrow(iter_df) > 0) {
+    ggplot(iter_df, aes(x = Iteration)) +
+      geom_line(aes(y = `Player 1`, color = "Player 1")) +
+      geom_line(aes(y = `Player 2`, color = "Player 2")) +
+      labs(
+        title = paste("Path to Equilibrium:", case_name),
+        x = "Iteration", 
+        y = "Price",
+        color = "Players"
+      ) +
+      theme_minimal()
+  } else {
+    message("No data available for path to equilibrium plot.")
+  }
+  
+  eq_df <- data.frame(Product = c(products, "Outside"), Price = c(eq_price, 0))
+  
+  if (nrow(eq_df) > 0) {
+    ggplot(eq_df, aes(x = Product, y = Price)) +
+      geom_bar(stat = "identity", fill = "steelblue") +
+      labs(
+        title = paste("Equilibrium Prices:", case_name),
+        x = "Product", 
+        y = "Price"
+      ) +
+      theme_minimal()
+  } else {
+    message("No data available for equilibrium prices plot.")
+  }
+  
+  # Return Results
+  return(list(EquilibriumPrices = eq_price, Shares = eq_shares, Profits = eq_profits))
+}
