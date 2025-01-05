@@ -190,7 +190,7 @@ for (i in seq_along(E_Data_c$lgtdata)) {
 lm_model <- lm(price ~ ., data = as.data.frame(E_Data_c$lgtdata[[1]]$X))
 
 # Calculate VIF for each variable in the model to check for multicollinierity
-vif_values <- vif(ols_model)
+vif_values <- vif(lm_model)
 
 # View the VIF values to check for multicollinierity
 print(vif_values)
@@ -219,12 +219,6 @@ vif_values <- vif(ols_model)
 
 # View the VIF values
 print(vif_values)
-#Defining Baseline for categorical attributes (brand, review & tes
-
-# Remove baseline attributes from X for all respondents
-for (i in seq_along(E_Data_c$lgtdata)) {
-  E_Data_c$lgtdata[[i]]$X <- E_Data_c$lgtdata[[i]]$X[, -c(2, 26, 31)]   # Remove 'michelin', 'rev_1star', 'test_1star'# Fit the linear regression model (OLS)
-}
 
 # Linear Model after baseline  
 ols_model <- lm(choice ~ ., data = X_all_df)
@@ -242,10 +236,6 @@ print(vif_values)
 ols_coefficients <- summary(ols_model)$coefficients
 print(ols_coefficients)
 
-library(mclogit)
-out_logit=cbind(dat22$choice,dat22$Task) [1:30,] ## can't use this variable below: 
-## Error in formula[[2]][[1]] : object of type 'symbol' is not subsettable  
-
 # Load the package
 library(mclogit)
 
@@ -258,7 +248,7 @@ X_all_df$alt <- rep(1:E_Data_c$p, times = nrow(X_all) / E_Data_c$p)  # Alternati
 #Multinomial Logit Model Analysis
 out_logit <- mclogit(
   cbind(choice, id) ~ 
-    continental +
+    price + continental +
     goodyear +
     bridgestone +
     pirelli +
@@ -295,44 +285,236 @@ out_logit <- mclogit(
 # Summarize the model results
 summary(out_logit)
 
-#Predicted Probability of alternatives using MClogit
+# Brands Matrix (Baseline: low_price-brand)
+Brands <- matrix(c(
+  1, 0, 0, 0, 0, 0, 0, 0, 0,  # Continental
+  0, 1, 0, 0, 0, 0, 0, 0, 0,  # Goodyear
+  0, 0, 1, 0, 0, 0, 0, 0, 0,  # Bridgestone
+  0, 0, 0, 1, 0, 0, 0, 0, 0,  # Pirelli
+  0, 0, 0, 0, 1, 0, 0, 0, 0,  # Kleber
+  0, 0, 0, 0, 0, 1, 0, 0, 0,  # BFGoodrich
+  0, 0, 0, 0, 0, 0, 1, 0, 0,  # Firestone
+  0, 0, 0, 0, 0, 0, 0, 1, 0   # Hankook
+), byrow = TRUE, ncol = 9)
+
+# Set row and column names
+rownames(Brands) <- c("continental", "goodyear", "bridgestone", "pirelli", "kleber", "bfgoodrich", "firestone", "hankook")
+colnames(Brands) <- c("continental", "goodyear", "bridgestone", "pirelli", "kleber", "bfgoodrich", "firestone", "hankook", "low_price-brand")
+
+# Print Brands Matrix
+print(Brands)
 
 
-# Create the Brands matrix
-Brands <- matrix(0, nrow = 9, ncol = 8)  # 9 levels × 8 coefficients
-rownames(Brands) <- c("continental", "goodyear", "bridgestone", "pirelli", 
-                      "kleber", "bfgoodrich", "firestone", "hankook", "`low_price-brand`")
-colnames(Brands) <- names(out_logit$coefficients)[1:8]  # Coefficients for brands
+# Type Matrix (Baseline: sports_type)
+Type <- matrix(c(
+  1, 0  # comfort_type
+), byrow = TRUE, nrow = 1)
 
-# Fill diagonal with 1s for corresponding attributes, excluding the baseline
-diag(Brands[1:8, 1:8]) <- 1  # Only rows 1 to 8 (baseline:low_price_brand row remains zero)
+# Set row and column names
+rownames(Type) <- c("comfort_type")  # Only the non-baseline level as a row
+colnames(Type) <- c("comfort_type", "sports_type")  # Include baseline in the column names
 
-Type <- matrix(0, nrow = 2, ncol = 1)  # 2 levels × 1 coefficient
-rownames(Type) <- c("comfort_type", "sports_type")
-colnames(Type) <- rownames(Type)[2]  # Only one column for "sports_type"
-Type[2, 1] <- 1 #Baseline: Comfort_type
+# Print the Type matrix
+print(Type)
 
-Longevity <- matrix(0, nrow = 4, ncol = 3)  # 4 levels × 3 coefficients
-rownames(Longevity) <- c("min_4thou_km", "stand_longevity_km", "plus_4thou_km", "plus_8thou_km")
-colnames(Longevity) <- rownames(Longevity)[2:4]  # Excluding baseline
-diag(Longevity[2:4, ]) <- 1 #Baseline: min_4thou_km
+# Longevity Matrix (Baseline: min_4thou_km)
+Longevity <- matrix(c(
+  0, 1, 0, 0,  # stand_longevity_km
+  0, 0, 1, 0,  # plus_4thou_km
+  0, 0, 0, 1   # plus_8thou_km
+), byrow = TRUE, nrow = 3)
 
-FuelEfficiency <- matrix(0, nrow = 4, ncol = 3)  # 4 levels × 3 coefficients
-rownames(FuelEfficiency) <- c("fuel_eff_F", "fuel_eff_B", "fuel_eff_C", "fuel_eff_E")
-colnames(FuelEfficiency) <- rownames(FuelEfficiency)[2:4]  # Excluding baseline
-diag(FuelEfficiency[2:4, ]) <- 1 #baseline: fuel_eff_F
+# Set row and column names
+rownames(Longevity) <- c("stand_longevity_km", "plus_4thou_km", "plus_8thou_km")  # Non-baseline levels as rows
+colnames(Longevity) <- c("min_4thou_km", "stand_longevity_km", "plus_4thou_km", "plus_8thou_km")  # Include baseline in columns
 
-Grip <- matrix(0, nrow = 4, ncol = 3)  # 4 levels × 3 coefficients
-rownames(Grip) <- c("grip_wet_F", "grip_wet_B", "grip_wet_C", "grip_wet_E")
-colnames(Grip) <- rownames(Grip)[2:4]  # Excluding baseline
-diag(Grip[2:4, ]) <- 1 # baseline: grip_wet_F
+# Print the Longevity matrix
+print(Longevity)
 
-Reviews <- matrix(0, nrow = 4, ncol = 3)  # 4 levels × 3 coefficients
-rownames(Reviews) <- c("rev_2star", "rev_3star", "rev_4star", "rev_5star")
-colnames(Reviews) <- rownames(Reviews)[2:4]  # Excluding baseline
-diag(Reviews[2:4, ]) <- 1 #baseline: rev_2star
+# Rolling Matrix (Baseline: fuel_eff_B)
+Rolling <- matrix(c(
+  0, 1, 0, 0,  # fuel_eff_C
+  0, 0, 1, 0,  # fuel_eff_E
+  0, 0, 0, 1   # fuel_eff_F
+), byrow = TRUE, nrow = 3)
 
-Test <- matrix(0, nrow = 4, ncol = 3)  # 4 levels × 3 coefficients
-rownames(Test) <- c("test_2star", "test_3star", "test_4star", "test_5star")
-colnames(Test) <- rownames(Test)[2:4]  # Excluding baseline
-diag(Test[2:4, ]) <- 1 #baseline: test_2star
+# Set row and column names
+rownames(Rolling) <- c("fuel_eff_C", "fuel_eff_E", "fuel_eff_F")  # Non-baseline levels as rows
+colnames(Rolling) <- c("fuel_eff_B", "fuel_eff_C", "fuel_eff_E", "fuel_eff_F")  # Include baseline in columns
+
+# Print the Rolling matrix
+print(Rolling)
+
+# Grip Matrix (Baseline: grip_wet_B)
+Grip <- matrix(c(
+  0, 1, 0, 0,  # grip_wet_C
+  0, 0, 1, 0,  # grip_wet_E
+  0, 0, 0, 1   # grip_wet_F
+), byrow = TRUE, nrow = 3)
+
+# Set row and column names
+rownames(Grip) <- c("grip_wet_C", "grip_wet_E", "grip_wet_F")  # Non-baseline levels as rows
+colnames(Grip) <- c("grip_wet_B", "grip_wet_C", "grip_wet_E", "grip_wet_F")  # Include baseline as the first column
+
+# Print the Grip matrix
+print(Grip)
+
+# Review Matrix (Baseline: rev_2star)
+Review <- matrix(c(
+  0, 1, 0, 0,  # rev_3star
+  0, 0, 1, 0,  # rev_4star
+  0, 0, 0, 1   # rev_5star
+), byrow = TRUE, nrow = 3)
+
+# Set row and column names
+rownames(Review) <- c("rev_3star", "rev_4star", "rev_5star")  # Non-baseline levels as rows
+colnames(Review) <- c("rev_2star", "rev_3star", "rev_4star", "rev_5star")  # Include baseline as the first column
+
+# Print the Review matrix
+print(Review)
+
+# Test Matrix (Baseline: test_2star)
+Test <- matrix(c(
+  0, 1, 0, 0,  # test_3star
+  0, 0, 1, 0,  # test_4star
+  0, 0, 0, 1   # test_5star
+), byrow = TRUE, nrow = 3)
+
+# Set row and column names
+rownames(Test) <- c("test_3star", "test_4star", "test_5star")  # Non-baseline levels as rows
+colnames(Test) <- c("test_2star", "test_3star", "test_4star", "test_5star")  # Include baseline as the first column
+
+# Print the Test matrix
+print(Test)
+
+
+# Define price values for the alternatives
+alt_prices <- c(5.5, 3.0, 7.6)  # Example prices corresponding to your summary statistics
+
+# Define alternatives using the attribute matrices
+alt1 <- c(
+  price = alt_prices[1],
+  Brands["goodyear", ],
+  Type["comfort_type", ],
+  Longevity["stand_longevity_km",],
+  Rolling[ "fuel_eff_E",],
+  Grip["grip_wet_E",],
+  Review["rev_4star",],
+  Test["test_5star",]
+)
+
+alt2 <- c(
+  price = alt_prices[2],
+  Brands["bridgestone", ],
+  Type["comfort_type", ],
+  Longevity["plus_4thou_km",],
+  Rolling["fuel_eff_F",],
+  Grip["grip_wet_F",],
+  Review["rev_5star",],
+  Test["test_4star",]
+)
+
+alt3 <- c(
+  price = alt_prices[3],
+  Brands["kleber", ],
+  Type["comfort_type", ],
+  Longevity["plus_8thou_km",],
+  Rolling["fuel_eff_C",],
+  Grip["grip_wet_C",],
+  Review["rev_3star",],
+  Test["test_3star",]
+)
+
+# Outside option (all zeros, representing no selection from defined alternatives)
+alt_outside <- numeric(length(out_logit$coefficients))
+
+# Combine into a choice set
+choiceset <- rbind(alt1, alt2, alt3, alt_outside)
+
+# Set column names to match out_logit coefficients
+colnames(choiceset) <- names(out_logit$coefficients)
+
+# Set row names for alternatives
+rownames(choiceset) <- c("alt1", "alt2", "alt3", "outside")
+
+# Print the choiceset
+print(choiceset)
+
+######computing 'counterfactual' choice probabilities given estimates from data######
+
+Xbeta = choiceset %*% out_logit$coefficients
+
+## direct 
+prob_=exp(Xbeta)/sum(exp(Xbeta))
+
+## with numerical stabilization
+Xbetas = Xbeta - max(Xbeta)
+logdenom = log(sum(exp(Xbetas)))
+logprob = Xbetas - logdenom
+prob = exp(logprob)
+
+cbind(choiceset,prob)
+
+# Combine all y vectors
+y_all <- unlist(lapply(E_Data_c$lgtdata, function(respondent_data) respondent_data$y))
+
+# Combine all X matrices
+X_all <- do.call(rbind, lapply(E_Data_c$lgtdata, function(respondent_data) respondent_data$X))
+
+# Verify dimensions
+print(length(y_all))  # Should be (number of respondents) × (tasks per respondent) = 3652 × 15
+print(dim(X_all))     # Should be length(y_all) × number of attributes = 54780 × 32 (after baseline adjustment)
+
+aligned <- nrow(X_all) == length(y_all) * E_Data_c$p
+print(aligned)  # Should return TRUE
+
+#######Mixed Logit (Hierarchical Bayesian) Model########
+
+library(bayesm)
+
+out_HB_covariateswithoutconst <- rhierMnlRwMixture(
+  Data = list(
+    lgtdata = E_Data_c$lgtdata,  # All choice data
+    Z = E_Data_c$Z,             # Covariates
+    p = E_Data_c$p              # Number of alternatives per task
+  ),
+  Prior = list(ncomp = 1),      # No sign constraint applied
+  Mcmc = list(R = 40000, keep = 10)  # 40,000 iterations, thinning every 10
+)
+
+#Verify Convergence of the Model
+windows()
+plot(out_HB_covariateswithoutconst$loglike, type = "l", main = "Log-Likelihood Over Iterations",
+     xlab = "Iterations", ylab = "Log-Likelihood")
+
+# Get the dimensions of beta draws
+print(dim(out_HB_covariateswithoutconst$betadraw))  # Respondents × Attributes × Iterations
+
+# Extract posterior draws
+burn_in <- 1800  # Set burn-in period
+betadraw_converged_w <- out_HB_covariateswithoutconst$betadraw[, , (burn_in + 1):dim(out_HB_covariateswithoutconst$betadraw)[3]]
+
+# Compute posterior means across iterations for each respondent and attribute
+posterior_means_w <- apply(betadraw_converged_w, c(1, 2), mean)  # Respondents × Attributes
+
+summary(posterior_means_w)
+
+#Combine iterations into a single respondent-level array for betaexchange
+betaexchange <- array(
+  aperm(betadraw_converged_w, perm = c(1, 3, 2)),
+  dim = c(dim(betadraw_converged_w)[1] * dim(betadraw_converged_w)[3], dim(betadraw_converged_w)[2])
+)
+
+# Compute the mean and heterogeneity (standard deviation) across respondents
+mpref <- cbind(
+  colMeans(betaexchange),                # Mean preferences for each attribute
+  apply(betaexchange, 2, sd)             # Heterogeneity (SD) of preferences
+)
+
+
+# Assign column names
+colnames(mpref) <- c("Mean Preference", "SD")
+rownames(mpref) <- colnames(E_Data_c$lgtdata[[1]]$X)
+
+# View the results
+print(round(mpref, digits = 3))
