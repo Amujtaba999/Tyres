@@ -623,3 +623,188 @@ if (!"out_order" %in% ls()) {
 
 print(out_order)
 
+Nash Equilibrium
+###################################################################################
+##### ILLUSTRATE NASH COMPUTATIONS ################################################
+###################################################################################
+
+### Settings: Two brands (players), A & B, and an outside good
+
+rm(list = ls())
+
+# Load Required Libraries
+library(MASS)
+library(lattice)
+library(Matrix)
+library(bayesm)
+library(matrixcalc)
+library(ggplot2)
+
+###################################################################################
+##### FUNCTIONS ###################################################################
+###################################################################################
+
+# First-Order Condition (FOC) Function
+FOC <- function(prices, design, beta, costs, FC = FALSE) {
+  fullDesign <- cbind(design, prices)
+  xbeta <- beta %*% t(fullDesign)
+  xbeta <- pmin(pmax(xbeta, -500), 500)  # Correct for underflow and overflow
+  probabilities <- exp(xbeta) / rowSums(exp(xbeta))
+  
+  if (FC) {
+    probabilities <- t(apply(xbeta, 1, function(x) (x == max(x)) * 1))
+  }
+  
+  insideGoods <- which(prices != 0)
+  probsInside <- probabilities[, insideGoods, drop = FALSE]
+  delprofit <- colMeans(probsInside * (1 - probsInside) * beta[, ncol(beta)]) * 
+    (rowSums(prices - costs)[insideGoods]) + colMeans(probsInside)
+  
+  return(delprofit)
+}
+
+# Compute Shares
+computeShares <- function(prices, beta, design, FC = FALSE) {
+  fullDesign <- cbind(design, prices)
+  xbeta <- beta %*% t(fullDesign)
+  max_xbeta <- xbeta[cbind(1:nrow(xbeta), max.col(xbeta))]
+  probabilities <- exp(xbeta - max_xbeta) / rowSums(exp(xbeta - max_xbeta))
+  
+  if (FC) {
+    probabilities <- t(apply(xbeta, 1, function(x) (x == max(x)) * 1))
+  }
+  
+  return(colMeans(probabilities))
+}
+
+# Compute Profits
+computeProfit <- function(design, prices, beta, costs, FC = FALSE, outside = FALSE) {
+  fullDesign <- cbind(design, prices)
+  xbeta <- beta %*% t(fullDesign)
+  max_xbeta <- xbeta[cbind(1:nrow(xbeta), max.col(xbeta))]
+  probabilities <- exp(xbeta - max_xbeta) / rowSums(exp(xbeta - max_xbeta))
+  
+  if (FC) {
+    probabilities <- t(apply(xbeta, 1, function(x) (x == max(x)) * 1))
+  }
+  
+  net_price <- (prices - costs)
+  profits <- colMeans(probabilities) * net_price
+  
+  return(list(profits = profits, demand = colMeans(probabilities)))
+}
+
+# Nash Equilibrium Function
+nashEquilibrium <- function(design, startingPrices, costs, beta, priceRange, grp, FC = FALSE, freeze = NULL) {
+  prices <- as.matrix(startingPrices)
+  tol <- 1e-4
+  maxIter <- 20
+  numIters <- 0
+  path_eq_prices <- list()
+  path_eq_prices[[1]] <- prices
+  
+  while (TRUE) {
+    oldPrices <- prices
+    for (i in seq_len(nrow(prices))) {
+      if (!is.null(freeze) && i %in% freeze) next
+      cp <- function(p) {
+        prices[i, prices[i, ] != 0] <- p
+        sum(computeProfit(design, prices, beta, costs, FC)$profits[grp == grp[i]])
+      }
+      prices[i, prices[i, ] != 0] <- optimize(cp, interval = priceRange[i, ], maximum = TRUE)$maximum
+    }
+    numIters <- numIters + 1
+    path_eq_prices[[numIters + 1]] <- prices
+    
+    if (sum(abs(prices - oldPrices)) < tol || numIters == maxIter) break
+  }
+  
+  return(list(eq_prices = prices[prices != 0], iterations = numIters, path_eq_prices = path_eq_prices))
+}
+
+###################################################################################
+##### MAIN SCRIPT #################################################################
+###################################################################################
+
+# Define Products
+products <- c("michelin", "continental", "goodyear")
+
+runCase <- function(nplayers, nunits, avgbeta, sigma_values, pr_ranges, case_name) {
+  # Generate Draws
+  sigma <- diag(sigma_values, nrow = (nplayers + 1), ncol = (nplayers + 1))
+  betastartemp <- mvrnorm(n = nunits, avgbeta, sigma)
+  
+  # Include Sign Restriction on Price Coefficients
+  beta <- cbind(betastartemp[, 1:nplayers], -exp(betastartemp[, nplayers + 1]))
+  colnames(beta) <- c("Brand A", "Brand B", "price")
+  
+  # Define Design Matrix and Pricing
+  designBase <- rbind(diag(nplayers), rep(0, nplayers))
+  pr_range_mat <- array(pr_ranges, dim = c(nplayers, 2))
+  
+  if (any(pr_ranges <= 0) || any(pr_range_mat[, 1] >= pr_range_mat[, 2])) {
+    stop("Invalid price ranges: Ensure that minimum prices are less than maximum prices.")
+  }
+  
+  startingPrices <- c(pr_range_mat[, 1], 0)
+  costBase <- c(0.1 * pr_range_mat[, 1], 0)
+  grp <- seq(nplayers)
+  
+  # Compute Nash Equilibrium
+  eqBase <- nashEquilibrium(
+    design = designBase, 
+    startingPrices = startingPrices, 
+    costs = costBase, 
+    beta = beta, 
+    priceRange = pr_range_mat, 
+    grp = grp, 
+    FC = FALSE, 
+    freeze = 0
+  )
+  
+  if (length(eqBase$path_eq_prices) < 2) {
+    stop("Equilibrium computation failed to generate a valid path.")
+  }
+  
+  eq_price <- eqBase$eq_prices
+  eq_shares <- computeShares(prices = c(eq_price, 0), beta = beta, design = designBase, FC = FALSE)
+  eq_profits <- computeProfit(prices = c(eq_price, 0), beta = beta, design = designBase, costs = costBase, FC = FALSE)$profits
+  
+  # Create Data Frame for Visualization
+  iter_prices <- do.call(rbind, lapply(eqBase$path_eq_prices, function(x) x[1:nplayers]))
+  iter_df <- data.frame(Iteration = 1:nrow(iter_prices), iter_prices)
+  colnames(iter_df) <- c("Iteration", paste0("Player ", 1:nplayers))
+  
+  if (nrow(iter_df) > 0) {
+    ggplot(iter_df, aes(x = Iteration)) +
+      geom_line(aes(y = `Player 1`, color = "Player 1")) +
+      geom_line(aes(y = `Player 2`, color = "Player 2")) +
+      labs(
+        title = paste("Path to Equilibrium:", case_name),
+        x = "Iteration", 
+        y = "Price",
+        color = "Players"
+      ) +
+      theme_minimal()
+  } else {
+    message("No data available for path to equilibrium plot.")
+  }
+  
+  eq_df <- data.frame(Product = c(products, "Outside"), Price = c(eq_price, 0))
+  
+  if (nrow(eq_df) > 0) {
+    ggplot(eq_df, aes(x = Product, y = Price)) +
+      geom_bar(stat = "identity", fill = "steelblue") +
+      labs(
+        title = paste("Equilibrium Prices:", case_name),
+        x = "Product", 
+        y = "Price"
+      ) +
+      theme_minimal()
+  } else {
+    message("No data available for equilibrium prices plot.")
+  }
+  
+  # Return Results
+  return(list(EquilibriumPrices = eq_price, Shares = eq_shares, Profits = eq_profits))
+}
